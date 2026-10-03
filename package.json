@@ -1,0 +1,15 @@
+{
+  "name": "raise-2-resolve",
+  "version": "1.0.0",
+  "description": "BUILDION - Raise 2 Resolve Civic Issues Resolution Platform",
+  "private": true,
+  "scripts": {
+    "setup": "cd backend && npm install && cd ../frontend && npm install",
+    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "backend": "npm run dev --prefix backend",
+    "frontend": "npm run dev --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
