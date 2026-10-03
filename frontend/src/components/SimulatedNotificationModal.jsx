@@ -108,7 +108,7 @@ export default function SimulatedNotificationModal({ notification, onClose }) {
             {/* Email Header */}
             <div style={{ backgroundColor: '#f8fafc', padding: '0.875rem 1rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
               <div><strong style={{ color: '#0f172a' }}>To:</strong> {email.to} ({citizenName})</div>
-              <div><strong style={{ color: '#0f172a' }}>From:</strong> notifications@buildion.gov</div>
+              <div><strong style={{ color: '#0f172a' }}>From:</strong> notifications@raise2resolve.gov</div>
               <div><strong style={{ color: '#0f172a' }}>Subject:</strong> {email.subject}</div>
               <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Sent: {new Date(timestamp).toLocaleString()}</div>
             </div>

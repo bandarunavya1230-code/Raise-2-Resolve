@@ -1,0 +1,8 @@
+{
+  "name": "Raise 2 Resolve",
+  "description": "Civic issues resolution platform empowering citizens and municipal authorities to track, prioritize, and resolve community complaints.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

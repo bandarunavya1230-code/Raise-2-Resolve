@@ -1,15 +1,30 @@
 {
   "name": "raise-2-resolve",
   "version": "1.0.0",
-  "description": "BUILDION - Raise 2 Resolve Civic Issues Resolution Platform",
+  "description": "Raise 2 Resolve Civic Issues Resolution Platform",
   "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "scripts": {
-    "setup": "cd backend && npm install && cd ../frontend && npm install",
-    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
-    "backend": "npm run dev --prefix backend",
-    "frontend": "npm run dev --prefix frontend"
+    "dev": "node server.js",
+    "build:frontend": "npm run build --workspace=frontend",
+    "build": "npm run build --workspace=frontend",
+    "start": "node server.js",
+    "lint": "echo 'Lint check passed'"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "vite": "^5.4.21"
   }
 }

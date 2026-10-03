@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { UserPlus, AlertCircle } from 'lucide-react';
+import { UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -44,19 +44,36 @@ export default function Register() {
   };
 
   return (
-    <div className="container" style={{ maxWidth: '440px', padding: '3rem 1.5rem' }}>
-      <div className="card">
-        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <div style={{ display: 'inline-flex', padding: '0.75rem', backgroundColor: '#dbeafe', color: '#2563eb', borderRadius: '50%', marginBottom: '0.75rem' }}>
-            <UserPlus size={28} />
+    <div className="container" style={{ maxWidth: '460px', padding: '3.5rem 1.5rem' }}>
+      <div className="card" style={{ padding: '2rem 1.75rem', border: '1px solid #e2e8f0', boxShadow: 'var(--shadow-md)' }}>
+        
+        {/* Header with 🔵 Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 50%, #1e40af 100%)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ffffff',
+            marginBottom: '1rem',
+            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
+          }}>
+            <UserPlus size={24} />
           </div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '700' }}>Register Citizen Account</h2>
-          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Join Raise 2 Resolve to report and upvote civic issues</p>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.35rem' }}>
+            Register Citizen Account
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
+            Join Raise 2 Resolve to report and upvote community issues
+          </p>
         </div>
 
         {error && (
           <div className="alert alert-danger" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <AlertCircle size={18} />
+            <AlertCircle size={18} style={{ flexShrink: 0 }} />
             <span>{error}</span>
           </div>
         )}
@@ -68,7 +85,7 @@ export default function Register() {
               id="name"
               type="text"
               className="form-control"
-              placeholder="John Citizen"
+              placeholder="e.g. Maria Gonzalez"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -94,7 +111,7 @@ export default function Register() {
               id="password"
               type="password"
               className="form-control"
-              placeholder="••••••••"
+              placeholder="At least 6 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -107,20 +124,25 @@ export default function Register() {
               id="confirmPassword"
               type="password"
               className="form-control"
-              placeholder="••••••••"
+              placeholder="Repeat password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
             />
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }} disabled={submitting}>
-            {submitting ? 'Creating Account...' : 'Create Citizen Account'}
+          <button 
+            type="submit" 
+            className="btn btn-primary" 
+            style={{ width: '100%', justifyContent: 'center', marginTop: '0.75rem', padding: '0.75rem' }} 
+            disabled={submitting}
+          >
+            {submitting ? 'Creating Citizen Account...' : 'Create Account'}
           </button>
         </form>
 
-        <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.875rem', color: '#64748b' }}>
-          Already have an account? <Link to="/login" style={{ fontWeight: '600' }}>Sign in</Link>
+        <div style={{ textAlign: 'center', marginTop: '1.75rem', fontSize: '0.875rem', color: '#64748b' }}>
+          Already have an account? <Link to="/login" style={{ fontWeight: '700', color: '#2563eb' }}>Sign in here</Link>
         </div>
       </div>
     </div>

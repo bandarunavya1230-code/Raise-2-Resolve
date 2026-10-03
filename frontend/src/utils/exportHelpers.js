@@ -89,7 +89,7 @@ export function exportToPDF(complaints = []) {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text('BUILDION - Raise 2 Resolve Municipal Complaints Report', 14, 16);
+  doc.text('Raise 2 Resolve – Municipal Complaints Report', 14, 16);
 
   // Sub-header metadata
   doc.setTextColor(71, 85, 105);

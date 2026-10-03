@@ -34,7 +34,7 @@ app.use('/api/complaints', complaintRoutes);
 // Root Endpoint
 app.get('/', (req, res) => {
   res.json({
-    message: '🚀 BUILDION - Raise 2 Resolve API Server Running',
+    message: '🚀 Raise 2 Resolve API Server Running',
     health: '/api/health'
   });
 });

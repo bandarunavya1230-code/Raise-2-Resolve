@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
     return res.json({
       success: true,
       status: 'online',
-      app: 'BUILDION - Raise 2 Resolve API',
+      app: 'Raise 2 Resolve API',
       timestamp: new Date().toISOString(),
       database: 'connected',
       usersTotal: userCount.count

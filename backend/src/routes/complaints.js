@@ -46,7 +46,7 @@ function createSimulatedNotifications(complaint, author, nextStatus, updateText)
       label: '[SIMULATED EMAIL NOTIFICATION]',
       to: citizenEmail,
       subject: `[Raise 2 Resolve] Ticket #${code} Status Update: ${nextStatus.toUpperCase().replace('_', ' ')}`,
-      body: `Hello ${citizenName},\n\nThe status of your reported civic complaint #${code} (${complaint.title}) at "${complaint.location}" has been updated to "${nextStatus.toUpperCase().replace('_', ' ')}".\n\nOfficial Municipal Remark:\n"${updateText}"\n\nYou can track step-by-step progress on your Raise 2 Resolve Citizen Dashboard.\n\nRegards,\nBUILDION Municipal Authority`
+      body: `Hello ${citizenName},\n\nThe status of your reported civic complaint #${code} (${complaint.title}) at "${complaint.location}" has been updated to "${nextStatus.toUpperCase().replace('_', ' ')}".\n\nOfficial Municipal Remark:\n"${updateText}"\n\nYou can track step-by-step progress on your Raise 2 Resolve Citizen Dashboard.\n\nRegards,\nRaise 2 Resolve Municipal Authority`
     },
     sms: {
       label: '[SIMULATED SMS NOTIFICATION]',
