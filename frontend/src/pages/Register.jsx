@@ -49,25 +49,62 @@ export default function Register() {
         
         {/* Header with 🔵 Logo */}
         <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+          <img
+            src="/logo.jpg"
+            alt="Raise 2 Resolve Logo"
+            referrerPolicy="no-referrer"
+            style={{
+              width: '68px',
+              height: '68px',
+              borderRadius: '16px',
+              objectFit: 'cover',
+              boxShadow: '0 4px 16px rgba(37, 99, 235, 0.25)',
+              border: '2.5px solid #BFDBFE',
+              margin: '0 auto 1rem auto',
+              display: 'block'
+            }}
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
           <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 50%, #1e40af 100%)',
             display: 'inline-flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            color: '#ffffff',
-            marginBottom: '1rem',
-            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
+            lineHeight: '1',
+            letterSpacing: '-0.02em',
+            marginBottom: '0.4rem'
           }}>
-            <UserPlus size={24} />
+            <span style={{
+              fontWeight: '900',
+              fontSize: '1.45rem',
+              color: '#0F172A',
+              letterSpacing: '-0.02em'
+            }}>
+              RAISE
+            </span>
+            <span style={{
+              fontWeight: '950',
+              fontSize: '2.3rem',
+              color: '#2563EB',
+              lineHeight: '0.8',
+              display: 'inline-block',
+              margin: '0',
+              padding: '0 1px',
+              transform: 'translateY(-1px)'
+            }}>
+              2
+            </span>
+            <span style={{
+              fontWeight: '900',
+              fontSize: '1.45rem',
+              color: '#0284C7',
+              letterSpacing: '-0.02em'
+            }}>
+              RESOLVE
+            </span>
           </div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.35rem' }}>
-            Register Citizen Account
-          </h2>
           <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-            Join Raise 2 Resolve to report and upvote community issues
+            Join our civic network to report and upvote community issues
           </p>
         </div>
 

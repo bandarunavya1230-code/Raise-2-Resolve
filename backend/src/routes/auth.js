@@ -157,6 +157,49 @@ router.post('/demo-authority', async (req, res) => {
   }
 });
 
+// @route   POST /api/auth/demo-citizen
+// @desc    Quick demo login for Citizen role
+// @access  Public
+router.post('/demo-citizen', async (req, res) => {
+  try {
+    const db = await getDB();
+    let citizenUser = await db.get('SELECT * FROM users WHERE email = ?', ['citizen@raise2resolve.gov']);
+
+    if (!citizenUser) {
+      const hashedPassword = await bcrypt.hash('citizen123', 10);
+      const result = await db.run(
+        'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
+        ['Demo Citizen', 'citizen@raise2resolve.gov', hashedPassword, 'citizen']
+      );
+      citizenUser = {
+        id: result.lastID,
+        name: 'Demo Citizen',
+        email: 'citizen@raise2resolve.gov',
+        role: 'citizen'
+      };
+    }
+
+    const userData = {
+      id: citizenUser.id,
+      name: citizenUser.name,
+      email: citizenUser.email,
+      role: citizenUser.role
+    };
+
+    const token = generateToken(userData);
+
+    return res.json({
+      success: true,
+      message: 'Demo Citizen Login successful!',
+      token,
+      user: userData
+    });
+  } catch (error) {
+    console.error('Demo Citizen Login Error:', error);
+    return res.status(500).json({ success: false, message: 'Server error during demo login.' });
+  }
+});
+
 // @route   GET /api/auth/me
 // @desc    Get logged in user details
 // @access  Private

@@ -36,38 +36,55 @@ app.use('/api', locationRoutes);
 
 // Setup frontend serving
 async function setupFrontend() {
-  const isDev = process.env.NODE_ENV !== 'production';
   const distDir = path.join(__dirname, 'frontend/dist');
+  const distIndexHtml = path.join(distDir, 'index.html');
 
-  if (isDev) {
-    try {
-      const { createServer: createViteServer } = await import('vite');
-      const vite = await createViteServer({
-        root: path.join(__dirname, 'frontend'),
-        server: {
-          middlewareMode: true,
-          hmr: false
-        },
-        appType: 'spa'
-      });
-      app.use(vite.middlewares);
-      console.log('⚡ Vite dev middleware mounted');
-      return;
-    } catch (e) {
-      console.warn('⚠️ Could not start Vite dev middleware, falling back to static dist:', e.message);
-    }
-  }
-
-  // Fallback or Production: Serve built dist
-  if (fs.existsSync(distDir)) {
+  // Priority 1: Serve pre-compiled production build if available
+  // This guarantees fast, rock-solid rendering inside AI Studio iframes without Vite HMR/WebSocket issues
+  if (fs.existsSync(distIndexHtml)) {
     app.use(express.static(distDir));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distDir, 'index.html'));
+      res.sendFile(distIndexHtml);
     });
-    console.log('📦 Serving static frontend from frontend/dist');
-  } else {
+    console.log('📦 Serving compiled production frontend from frontend/dist');
+    return;
+  }
+
+  // Priority 2: In-memory Vite dev middleware fallback
+  try {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      root: path.join(__dirname, 'frontend'),
+      server: {
+        middlewareMode: true,
+        hmr: false
+      },
+      appType: 'spa'
+    });
+    app.use(vite.middlewares);
+    
+    // SPA fallback for HTML routes
+    app.use('*', async (req, res, next) => {
+      const url = req.originalUrl;
+      try {
+        const rawIndex = path.join(__dirname, 'frontend/index.html');
+        if (fs.existsSync(rawIndex)) {
+          let template = fs.readFileSync(rawIndex, 'utf-8');
+          template = await vite.transformIndexHtml(url, template);
+          res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+          return;
+        }
+        next();
+      } catch (e) {
+        next(e);
+      }
+    });
+
+    console.log('⚡ Vite dev middleware mounted with SPA fallback');
+  } catch (e) {
+    console.warn('⚠️ Could not start Vite dev middleware:', e.message);
     app.get('*', (req, res) => {
-      res.status(404).send('Frontend not built. Please run `npm run build`.');
+      res.status(500).send('Frontend build not found. Please run `npm run build`.');
     });
   }
 }

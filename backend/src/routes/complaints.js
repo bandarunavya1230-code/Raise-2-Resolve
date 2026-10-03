@@ -637,9 +637,53 @@ router.post('/:id/verify', authenticateToken, authorizeRoles('authority'), async
     }
 
     const author = await db.get('SELECT name, email FROM users WHERE id = ?', [complaint.user_id]);
-    const newVerifyState = complaint.verification_status === 'verified' ? 'unverified' : 'verified';
+    
+    let newVerifyState = 'verified';
+    if (req.body.action === 'revoke' || req.body.action === 'unverify') {
+      newVerifyState = 'unverified';
+    } else if (req.body.department_id || req.body.department_name) {
+      newVerifyState = 'verified';
+    } else {
+      newVerifyState = complaint.verification_status === 'verified' ? 'unverified' : 'verified';
+    }
+
     const isVerifiedInt = newVerifyState === 'verified' ? 1 : 0;
     const nextStatus = newVerifyState === 'verified' ? (complaint.status === 'pending' ? 'verified' : complaint.status) : 'pending';
+
+    // Assign to a particular department upon verification
+    let assignedDeptId = complaint.department_id;
+    let assignedDeptName = complaint.department_name;
+
+    if (newVerifyState === 'verified') {
+      const { department_id, department_name } = req.body;
+      if (department_id) {
+        const d = await db.get('SELECT * FROM departments WHERE id = ?', [department_id]);
+        if (d) {
+          assignedDeptId = d.id;
+          assignedDeptName = d.name;
+        }
+      } else if (department_name) {
+        const d = await db.get('SELECT * FROM departments WHERE name = ?', [department_name]);
+        if (d) {
+          assignedDeptId = d.id;
+          assignedDeptName = d.name;
+        } else {
+          assignedDeptName = department_name;
+        }
+      }
+
+      // If still not assigned, automatically resolve appropriate department based on category
+      if (!assignedDeptName) {
+        const defaultDeptName = getDepartmentForCategory(complaint.category);
+        const d = await db.get('SELECT * FROM departments WHERE name = ?', [defaultDeptName]);
+        if (d) {
+          assignedDeptId = d.id;
+          assignedDeptName = d.name;
+        } else {
+          assignedDeptName = defaultDeptName;
+        }
+      }
+    }
 
     await db.run(`
       UPDATE complaints 
@@ -647,12 +691,26 @@ router.post('/:id/verify', authenticateToken, authorizeRoles('authority'), async
           is_verified = ?,
           verified_at = CURRENT_TIMESTAMP,
           verified_by = ?,
+          department_id = ?,
+          department_name = ?,
+          assigned_to = COALESCE(?, assigned_to, ?),
+          assigned_at = CURRENT_TIMESTAMP,
           status = ?
       WHERE id = ?
-    `, [newVerifyState, isVerifiedInt, req.user.id, nextStatus, complaintId]);
+    `, [
+      newVerifyState, 
+      isVerifiedInt, 
+      req.user.id, 
+      newVerifyState === 'verified' ? assignedDeptId : complaint.department_id,
+      newVerifyState === 'verified' ? assignedDeptName : complaint.department_name,
+      newVerifyState === 'verified' ? assignedDeptName : null,
+      newVerifyState === 'verified' ? assignedDeptName : null,
+      nextStatus, 
+      complaintId
+    ]);
 
     const remarkText = newVerifyState === 'verified'
-      ? (remarks || 'Official Verification Complete: Civic authority verified on-ground legitimacy and assigned priority.')
+      ? (remarks || `Official Verification Complete: Civic issue verified by authority and assigned to ${assignedDeptName} for on-ground resolution.`)
       : 'Verification Status Revoked for administrative re-examination.';
 
     await db.run(`
@@ -666,8 +724,12 @@ router.post('/:id/verify', authenticateToken, authorizeRoles('authority'), async
       success: true,
       verification_status: newVerifyState,
       is_verified: isVerifiedInt === 1,
+      assigned_department: assignedDeptName,
+      department_id: assignedDeptId,
       status: nextStatus,
-      message: newVerifyState === 'verified' ? 'Complaint verified by authority!' : 'Complaint marked unverified.',
+      message: newVerifyState === 'verified' 
+        ? `Complaint verified by authority and assigned to ${assignedDeptName}!` 
+        : 'Complaint marked unverified.',
       simulatedNotification
     });
   } catch (error) {

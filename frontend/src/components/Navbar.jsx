@@ -38,50 +38,77 @@ export default function Navbar() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        height: '74px'
+        height: '84px'
       }}>
         
-        {/* Brand Logo - 🔵 Raise 2 Resolve */}
+        {/* Brand Logo - 🔵 RAISE2RESOLVE */}
         <Link 
           to="/" 
           onClick={() => setMobileMenuOpen(false)}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', textDecoration: 'none' }}
         >
           <img
             src="/logo.jpg"
             alt="Raise 2 Resolve Logo"
             referrerPolicy="no-referrer"
             style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '10px',
+              width: '62px',
+              height: '62px',
+              borderRadius: '14px',
               objectFit: 'cover',
-              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.2)',
+              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.25)',
+              border: '2.5px solid #BFDBFE',
               flexShrink: 0
             }}
             onError={(e) => {
               e.currentTarget.style.display = 'none';
             }}
           />
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{
-              fontWeight: '800',
-              fontSize: '1.25rem',
-              lineHeight: '1.15',
-              color: '#0F172A',
-              letterSpacing: '-0.02em',
-              display: 'flex',
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.35rem'
+              lineHeight: '1',
+              letterSpacing: '-0.02em'
             }}>
-              Raise 2 Resolve
-            </span>
+              <span style={{
+                fontWeight: '900',
+                fontSize: '1.45rem',
+                color: '#0F172A',
+                letterSpacing: '-0.02em',
+                lineHeight: '1'
+              }}>
+                RAISE
+              </span>
+              <span style={{
+                fontWeight: '950',
+                fontSize: '2.3rem',
+                color: '#2563EB',
+                lineHeight: '0.8',
+                display: 'inline-block',
+                margin: '0',
+                padding: '0 1px',
+                transform: 'translateY(-1px)'
+              }}>
+                2
+              </span>
+              <span style={{
+                fontWeight: '900',
+                fontSize: '1.45rem',
+                color: '#0284C7',
+                letterSpacing: '-0.02em',
+                lineHeight: '1'
+              }}>
+                RESOLVE
+              </span>
+            </div>
             <span style={{
               fontSize: '0.72rem',
-              color: '#14B8A6',
-              fontWeight: '700',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase'
+              color: '#0D9488',
+              fontWeight: '800',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              marginTop: '0.2rem'
             }}>
               Civic Resolution Platform
             </span>
@@ -102,13 +129,6 @@ export default function Navbar() {
             style={{ color: '#334155', fontWeight: '600', fontSize: '0.925rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
           >
             <Compass size={16} color="#0284C7" /> Find Authority
-          </a>
-
-          <a 
-            href="/#departments" 
-            style={{ color: '#334155', fontWeight: '600', fontSize: '0.925rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Building2 size={16} color="#2563EB" /> Departments
           </a>
           
           {isAuthenticated && (
@@ -225,14 +245,6 @@ export default function Navbar() {
             style={{ color: '#0F172A', fontWeight: '600', padding: '0.4rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
           >
             <Compass size={17} color="#0284C7" /> Find Authority Near Me
-          </a>
-
-          <a 
-            href="/#departments" 
-            onClick={() => setMobileMenuOpen(false)}
-            style={{ color: '#0F172A', fontWeight: '600', padding: '0.4rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-          >
-            <Building2 size={17} color="#2563EB" /> Civic Departments
           </a>
 
           {isAuthenticated ? (

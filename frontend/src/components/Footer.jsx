@@ -21,25 +21,58 @@ export default function Footer() {
           
           {/* Column 1: Brand & Civic Tech Mission */}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.85rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '0.85rem' }}>
               <img
                 src="/logo.jpg"
                 alt="Raise 2 Resolve Logo"
                 referrerPolicy="no-referrer"
                 style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '8px',
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '12px',
                   objectFit: 'cover',
-                  boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)'
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                  border: '2px solid #BFDBFE'
                 }}
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                 }}
               />
-              <span style={{ fontWeight: '800', fontSize: '1.25rem', color: '#0F172A', letterSpacing: '-0.02em' }}>
-                Raise 2 Resolve
-              </span>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                lineHeight: '1',
+                letterSpacing: '-0.02em'
+              }}>
+                <span style={{
+                  fontWeight: '900',
+                  fontSize: '1.35rem',
+                  color: '#0F172A',
+                  letterSpacing: '-0.02em'
+                }}>
+                  RAISE
+                </span>
+                <span style={{
+                  fontWeight: '950',
+                  fontSize: '2.1rem',
+                  color: '#2563EB',
+                  lineHeight: '0.8',
+                  display: 'inline-block',
+                  margin: '0',
+                  padding: '0 1px',
+                  transform: 'translateY(-1px)'
+                }}>
+                  2
+                </span>
+                <span style={{
+                  fontWeight: '900',
+                  fontSize: '1.35rem',
+                  color: '#0284C7',
+                  letterSpacing: '-0.02em'
+                }}>
+                  RESOLVE
+                </span>
+              </div>
             </div>
             
             <p style={{ fontSize: '0.875rem', lineHeight: '1.6', color: '#64748B', marginBottom: '1.25rem' }}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import ComplaintDetailsModal from '../components/ComplaintDetailsModal';
@@ -6,8 +6,10 @@ import AuthorityDashboardView from '../components/AuthorityDashboardView';
 import FindAuthorityNearMe from '../components/FindAuthorityNearMe';
 import { 
   User, Shield, PlusCircle, List, Eye, ThumbsUp, Zap, Image, 
-  AlertTriangle, Building2, MapPin, Compass, CheckCircle2, ArrowRight 
+  AlertTriangle, Building2, MapPin, Compass, CheckCircle2, ArrowRight,
+  Edit3, Check
 } from 'lucide-react';
+import { INDIAN_STATES_AND_UTS, STATE_DISTRICTS } from '../data/indiaGeographicData';
 
 export default function Dashboard() {
   const { user, isAuthority, token } = useContext(AuthContext);
@@ -31,10 +33,12 @@ export default function Dashboard() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   
-  // Location Hierarchy selections
+  // Location Hierarchy selections & typing mode
+  const [locationInputMode, setLocationInputMode] = useState('select'); // 'select' | 'type'
+  const [locationType, setLocationType] = useState('city'); // 'village' | 'town' | 'city'
   const [selectedState, setSelectedState] = useState('Karnataka');
   const [selectedDistrict, setSelectedDistrict] = useState('Bengaluru Urban');
-  const [selectedCity, setSelectedCity] = useState('Bengaluru (City)');
+  const [selectedCity, setSelectedCity] = useState('Bengaluru');
   const [selectedWard, setSelectedWard] = useState('Ward 82 - Indiranagar');
   const [landmark, setLandmark] = useState('');
 
@@ -69,6 +73,8 @@ export default function Dashboard() {
             if (pl.district) setSelectedDistrict(pl.district);
             if (pl.city_town_village) setSelectedCity(pl.city_town_village);
             if (pl.ward_area) setSelectedWard(pl.ward_area);
+            if (pl.location_type) setLocationType(pl.location_type);
+            if (pl.landmark) setLandmark(pl.landmark);
           }
         }
 
@@ -204,9 +210,7 @@ export default function Dashboard() {
       formData.append('district', selectedDistrict);
       formData.append('city_town_village', selectedCity);
       formData.append('ward_area', selectedWard);
-      
-      const cityType = hierarchy[selectedState]?.[selectedDistrict]?.[selectedCity]?.type || 'city';
-      formData.append('location_type', cityType);
+      formData.append('location_type', locationType || 'city');
 
       if (selectedFile) {
         formData.append('image', selectedFile);
@@ -262,43 +266,49 @@ export default function Dashboard() {
     }
   };
 
-  // Cascade selections helper
-  const availableStates = Object.keys(hierarchy);
-  const availableDistricts = selectedState ? Object.keys(hierarchy[selectedState] || {}) : [];
-  const availableCities = (selectedState && selectedDistrict) 
-    ? Object.keys(hierarchy[selectedState][selectedDistrict] || {}) 
-    : [];
-  const availableWards = (selectedState && selectedDistrict && selectedCity)
-    ? (hierarchy[selectedState][selectedDistrict][selectedCity]?.wards || [])
-    : [];
+  // Comprehensive list of all 28 Indian States & 8 Union Territories
+  const availableStates = useMemo(() => {
+    return INDIAN_STATES_AND_UTS.map(s => s.name);
+  }, []);
+
+  // Comprehensive list of all districts for the currently selected State
+  const availableDistricts = useMemo(() => {
+    if (selectedState && STATE_DISTRICTS[selectedState]) {
+      return STATE_DISTRICTS[selectedState];
+    }
+    return Object.keys(hierarchy[selectedState] || {});
+  }, [selectedState, hierarchy]);
+
+  // Suggested cities / towns from hierarchy if available
+  const suggestedCities = useMemo(() => {
+    if (selectedState && selectedDistrict && hierarchy[selectedState]?.[selectedDistrict]) {
+      return Object.keys(hierarchy[selectedState][selectedDistrict]);
+    }
+    return [];
+  }, [selectedState, selectedDistrict, hierarchy]);
+
+  // Suggested wards from hierarchy if available
+  const suggestedWards = useMemo(() => {
+    if (selectedState && selectedDistrict && selectedCity && hierarchy[selectedState]?.[selectedDistrict]?.[selectedCity]?.wards) {
+      return hierarchy[selectedState][selectedDistrict][selectedCity].wards.map(w => w.ward_area);
+    }
+    return [];
+  }, [selectedState, selectedDistrict, selectedCity, hierarchy]);
 
   const handleStateChange = (state) => {
     setSelectedState(state);
-    const districts = Object.keys(hierarchy[state] || {});
+    const districts = STATE_DISTRICTS[state] || Object.keys(hierarchy[state] || {});
     const nextDistrict = districts[0] || '';
     setSelectedDistrict(nextDistrict);
-    
-    const cities = nextDistrict ? Object.keys(hierarchy[state][nextDistrict] || {}) : [];
-    const nextCity = cities[0] || '';
-    setSelectedCity(nextCity);
-
-    const wards = (nextCity && hierarchy[state][nextDistrict][nextCity]) ? hierarchy[state][nextDistrict][nextCity].wards : [];
-    setSelectedWard(wards[0]?.ward_area || '');
   };
 
   const handleDistrictChange = (district) => {
     setSelectedDistrict(district);
-    const cities = Object.keys(hierarchy[selectedState][district] || {});
-    const nextCity = cities[0] || '';
-    setSelectedCity(nextCity);
-
-    const wards = (nextCity && hierarchy[selectedState][district][nextCity]) ? hierarchy[selectedState][district][nextCity].wards : [];
-    setSelectedWard(wards[0]?.ward_area || '');
   };
 
   const handleCityChange = (city) => {
     setSelectedCity(city);
-    const wards = hierarchy[selectedState][selectedDistrict][city]?.wards || [];
+    const wards = hierarchy[selectedState]?.[selectedDistrict]?.[city]?.wards || [];
     setSelectedWard(wards[0]?.ward_area || '');
   };
 
@@ -543,7 +553,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* LOCATION HIERARCHY SELECTOR (Requirement 4) */}
+              {/* GEOGRAPHICAL LOCATION HIERARCHY SELECTOR & TYPING OPTION */}
               <div style={{
                 backgroundColor: '#F8FAFC',
                 padding: '1.25rem',
@@ -551,89 +561,247 @@ export default function Dashboard() {
                 border: '1px solid #E2E8F0',
                 marginBottom: '1.25rem'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.85rem', color: '#0F172A', fontWeight: '700', fontSize: '0.925rem' }}>
-                  <MapPin size={16} color="#2563EB" />
-                  <span>Geographical Location Hierarchy</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0F172A', fontWeight: '700', fontSize: '0.95rem' }}>
+                    <MapPin size={18} color="#2563EB" />
+                    <span>Geographical Location Hierarchy</span>
+                  </div>
+
+                  {/* Mode Toggle: Dropdown List Selection vs Direct Typing */}
+                  <div style={{ display: 'inline-flex', backgroundColor: '#E2E8F0', padding: '0.2rem', borderRadius: '8px', gap: '0.2rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setLocationInputMode('select')}
+                      style={{
+                        padding: '0.25rem 0.65rem',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        borderRadius: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        backgroundColor: locationInputMode === 'select' ? '#FFFFFF' : 'transparent',
+                        color: locationInputMode === 'select' ? '#2563EB' : '#64748B',
+                        boxShadow: locationInputMode === 'select' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none'
+                      }}
+                    >
+                      📋 Select from List
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLocationInputMode('type')}
+                      style={{
+                        padding: '0.25rem 0.65rem',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        borderRadius: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        backgroundColor: locationInputMode === 'type' ? '#FFFFFF' : 'transparent',
+                        color: locationInputMode === 'type' ? '#2563EB' : '#64748B',
+                        boxShadow: locationInputMode === 'type' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none'
+                      }}
+                    >
+                      ✍️ Direct Typing Mode
+                    </button>
+                  </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
-                  {/* State */}
+                {/* 1. Locality Type Selector (Village / Town / City) */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '0.35rem' }}>
+                    Locality Type *
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {[
+                      { id: 'village', label: '🌾 Village (Gram Panchayat)' },
+                      { id: 'town', label: '🏘️ Town (Municipality)' },
+                      { id: 'city', label: '🏢 City (Municipal Corporation)' }
+                    ].map(t => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setLocationType(t.id)}
+                        style={{
+                          padding: '0.35rem 0.75rem',
+                          borderRadius: '8px',
+                          fontSize: '0.8rem',
+                          fontWeight: '700',
+                          border: locationType === t.id ? '1.5px solid #2563EB' : '1px solid #CBD5E1',
+                          backgroundColor: locationType === t.id ? '#EFF6FF' : '#FFFFFF',
+                          color: locationType === t.id ? '#1D4ED8' : '#475569',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.85rem' }}>
+                  {/* State / UT */}
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '0.75rem' }}>State *</label>
-                    <select
-                      value={selectedState}
-                      onChange={(e) => handleStateChange(e.target.value)}
-                      className="form-control"
-                      style={{ fontSize: '0.85rem' }}
-                    >
-                      {availableStates.map(st => (
-                        <option key={st} value={st}>{st}</option>
-                      ))}
-                    </select>
+                    <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#334155' }}>
+                      State / Union Territory *
+                    </label>
+                    {locationInputMode === 'select' ? (
+                      <select
+                        value={selectedState}
+                        onChange={(e) => handleStateChange(e.target.value)}
+                        className="form-control"
+                        style={{ fontSize: '0.85rem', backgroundColor: '#FFFFFF' }}
+                        required
+                      >
+                        {availableStates.map(st => (
+                          <option key={st} value={st}>{st}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <>
+                        <input
+                          type="text"
+                          list="state-list-datalist"
+                          value={selectedState}
+                          onChange={(e) => handleStateChange(e.target.value)}
+                          placeholder="Type State or UT..."
+                          className="form-control"
+                          style={{ fontSize: '0.85rem', backgroundColor: '#FFFFFF' }}
+                          required
+                        />
+                        <datalist id="state-list-datalist">
+                          {availableStates.map(st => (
+                            <option key={st} value={st} />
+                          ))}
+                        </datalist>
+                      </>
+                    )}
                   </div>
 
                   {/* District */}
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '0.75rem' }}>District *</label>
-                    <select
-                      value={selectedDistrict}
-                      onChange={(e) => handleDistrictChange(e.target.value)}
-                      className="form-control"
-                      style={{ fontSize: '0.85rem' }}
-                    >
-                      {availableDistricts.map(dist => (
-                        <option key={dist} value={dist}>{dist}</option>
-                      ))}
-                    </select>
+                    <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#334155' }}>
+                      District *
+                    </label>
+                    {locationInputMode === 'select' ? (
+                      <select
+                        value={selectedDistrict}
+                        onChange={(e) => handleDistrictChange(e.target.value)}
+                        className="form-control"
+                        style={{ fontSize: '0.85rem', backgroundColor: '#FFFFFF' }}
+                        required
+                      >
+                        {availableDistricts.length > 0 ? (
+                          availableDistricts.map(dist => (
+                            <option key={dist} value={dist}>{dist}</option>
+                          ))
+                        ) : (
+                          <option value={selectedDistrict}>{selectedDistrict || 'Select District'}</option>
+                        )}
+                      </select>
+                    ) : (
+                      <>
+                        <input
+                          type="text"
+                          list="district-list-datalist"
+                          value={selectedDistrict}
+                          onChange={(e) => handleDistrictChange(e.target.value)}
+                          placeholder="Type District..."
+                          className="form-control"
+                          style={{ fontSize: '0.85rem', backgroundColor: '#FFFFFF' }}
+                          required
+                        />
+                        <datalist id="district-list-datalist">
+                          {availableDistricts.map(dist => (
+                            <option key={dist} value={dist} />
+                          ))}
+                        </datalist>
+                      </>
+                    )}
                   </div>
 
-                  {/* City/Town/Village */}
+                  {/* Village / Town / City (Typing Input with Suggestions) */}
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '0.75rem' }}>Village / Town / City *</label>
-                    <select
+                    <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#334155' }}>
+                      {locationType === 'village' ? 'Village Name *' : locationType === 'town' ? 'Town Name *' : 'City Name *'}
+                    </label>
+                    <input
+                      type="text"
+                      list="city-suggestions-datalist"
                       value={selectedCity}
-                      onChange={(e) => handleCityChange(e.target.value)}
+                      onChange={(e) => setSelectedCity(e.target.value)}
+                      placeholder={
+                        locationType === 'village'
+                          ? "Type Village name (e.g. Rampura, Hosahalli)"
+                          : locationType === 'town'
+                          ? "Type Town name (e.g. Ramanagara, Hoskote)"
+                          : "Type City name (e.g. Bengaluru, Mysuru, Hubballi)"
+                      }
                       className="form-control"
-                      style={{ fontSize: '0.85rem' }}
-                    >
-                      {availableCities.map(c => {
-                        const type = hierarchy[selectedState]?.[selectedDistrict]?.[c]?.type || 'city';
-                        const typeLabel = type === 'village' ? '🌾 Village' : type === 'town' ? '🏘️ Town' : '🏢 City';
-                        return (
-                          <option key={c} value={c}>{typeLabel}: {c}</option>
-                        );
-                      })}
-                    </select>
+                      style={{ fontSize: '0.85rem', backgroundColor: '#FFFFFF' }}
+                      required
+                    />
+                    <datalist id="city-suggestions-datalist">
+                      {suggestedCities.map(c => (
+                        <option key={c} value={c} />
+                      ))}
+                    </datalist>
                   </div>
 
-                  {/* Ward / Area */}
+                  {/* Area / Ward (Typing Input with Suggestions) */}
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '0.75rem' }}>Area / Ward *</label>
-                    <select
+                    <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#334155' }}>
+                      Area / Ward / Locality *
+                    </label>
+                    <input
+                      type="text"
+                      list="ward-suggestions-datalist"
                       value={selectedWard}
                       onChange={(e) => setSelectedWard(e.target.value)}
+                      placeholder="Type Area or Ward (e.g. Ward 82, Indiranagar, Main Road)"
                       className="form-control"
-                      style={{ fontSize: '0.85rem' }}
-                    >
-                      {availableWards.map(w => (
-                        <option key={w.id || w.ward_area} value={w.ward_area}>{w.ward_area}</option>
+                      style={{ fontSize: '0.85rem', backgroundColor: '#FFFFFF' }}
+                      required
+                    />
+                    <datalist id="ward-suggestions-datalist">
+                      {suggestedWards.map(w => (
+                        <option key={w} value={w} />
                       ))}
-                    </select>
+                    </datalist>
                   </div>
                 </div>
 
                 {/* Specific Street / Landmark */}
                 <div className="form-group" style={{ marginTop: '0.85rem', marginBottom: 0 }}>
-                  <label style={{ fontSize: '0.75rem' }}>Street / Landmark Reference *</label>
+                  <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#334155' }}>
+                    Street Name / Landmark Reference *
+                  </label>
                   <input
                     type="text"
-                    placeholder="e.g. Near Indiranagar Metro Station Pillar 12"
+                    placeholder="e.g. Opposite Community Hall, 2nd Cross, Near Metro Pillar 12"
                     value={landmark}
                     onChange={(e) => setLandmark(e.target.value)}
                     className="form-control"
-                    style={{ fontSize: '0.85rem' }}
+                    style={{ fontSize: '0.85rem', backgroundColor: '#FFFFFF' }}
                     required
                   />
+                </div>
+
+                {/* Confirmation Hierarchy Strip */}
+                <div style={{
+                  marginTop: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  backgroundColor: '#EFF6FF',
+                  borderRadius: '6px',
+                  border: '1px solid #BFDBFE',
+                  fontSize: '0.775rem',
+                  color: '#1E40AF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  flexWrap: 'wrap'
+                }}>
+                  <MapPin size={13} color="#2563EB" />
+                  <span><strong>Hierarchy:</strong> {selectedWard || '[Ward/Area]'} • {selectedCity || '[Village/Town/City]'} ({locationType}) • {selectedDistrict || '[District]'}, {selectedState || '[State]'}</span>
                 </div>
               </div>
 
@@ -874,15 +1042,7 @@ export default function Dashboard() {
 
       {/* CITIZEN VIEW: 3. FIND AUTHORITY NEAR ME TAB */}
       {!isAuthority && activeTab === 'find_authority' && (
-        <FindAuthorityNearMe 
-          onSelectLocation={(loc) => {
-            setSelectedState(loc.state);
-            setSelectedDistrict(loc.district);
-            setSelectedCity(loc.city_town_village);
-            setSelectedWard(loc.ward_area);
-            setActiveTab('report');
-          }}
-        />
+        <FindAuthorityNearMe />
       )}
 
       {/* DETAILS MODAL */}

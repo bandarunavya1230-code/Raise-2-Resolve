@@ -165,6 +165,124 @@ router.get('/departments', async (req, res) => {
   }
 });
 
+// GET /api/departments/by-district
+// Returns all respective departments for selected state and district along with complaint counts
+router.get('/departments/by-district', async (req, res) => {
+  try {
+    const { state, district, lat, lng } = req.query;
+    const db = await getDB();
+
+    const selectedState = (state || '').trim();
+    const selectedDistrict = (district || '').trim();
+
+    // 1. Fetch core departments from database
+    const coreDepartments = await db.all('SELECT * FROM departments ORDER BY id ASC');
+
+    // 2. Fetch complaint counts grouped by department/category for this state and district
+    let complaintStats = [];
+    if (selectedState || selectedDistrict) {
+      let query = `
+        SELECT 
+          id,
+          category,
+          department_id,
+          department_name,
+          status,
+          is_verified
+        FROM complaints 
+        WHERE 1=1
+      `;
+      const params = [];
+      if (selectedState) {
+        query += ' AND LOWER(TRIM(state)) = LOWER(?)';
+        params.push(selectedState);
+      }
+      if (selectedDistrict) {
+        query += ' AND LOWER(TRIM(district)) = LOWER(?)';
+        params.push(selectedDistrict);
+      }
+      complaintStats = await db.all(query, params);
+    }
+
+    // 3. For each department, calculate complaint stats and get verified authority info
+    const departmentsWithDetails = coreDepartments.map(dept => {
+      let dirCategory = 'Other';
+      const cat = (dept.category || dept.name || '').toLowerCase();
+      if (cat.includes('electr')) dirCategory = 'Electricity';
+      else if (cat.includes('water')) dirCategory = 'Water';
+      else if (cat.includes('road')) dirCategory = 'Roads';
+      else if (cat.includes('light')) dirCategory = 'Street Lights';
+      else if (cat.includes('sanitat') || cat.includes('waste') || cat.includes('garbage')) dirCategory = 'Garbage/Sanitation';
+      else if (cat.includes('drain')) dirCategory = 'Drainage';
+      else if (cat.includes('safety') || cat.includes('hazard')) dirCategory = 'Public Safety';
+      else if (cat.includes('police')) dirCategory = 'Police';
+      else if (cat.includes('health')) dirCategory = 'Health';
+      else if (cat.includes('educat')) dirCategory = 'Education';
+      else if (cat.includes('land') || cat.includes('revenue')) dirCategory = 'Revenue/Land';
+      else dirCategory = 'Municipal Services';
+
+      // Get verified authority details for this state & district
+      const auth = resolveVerifiedAuthority({
+        state: selectedState,
+        district: selectedDistrict,
+        category: dirCategory,
+        lat,
+        lng
+      });
+
+      // Filter complaints matching this department
+      const matchingComplaints = complaintStats.filter(c => {
+        const matchesId = c.department_id === dept.id;
+        const matchesName = c.department_name && c.department_name.toLowerCase() === dept.name.toLowerCase();
+        const matchesCat = c.category && c.category.toLowerCase().includes(dept.category.toLowerCase().split('/')[0].toLowerCase());
+        return matchesId || matchesName || matchesCat;
+      });
+
+      const totalCount = matchingComplaints.length;
+      const verifiedCount = matchingComplaints.filter(c => c.is_verified === 1).length;
+      const resolvedCount = matchingComplaints.filter(c => c.status === 'resolved').length;
+      const pendingCount = matchingComplaints.filter(c => c.status === 'pending' || c.status === 'verified').length;
+      const inProgressCount = matchingComplaints.filter(c => c.status === 'in_progress' || c.status === 'assigned').length;
+
+      return {
+        id: dept.id,
+        code: dept.code,
+        name: dept.name,
+        category: dept.category,
+        description: dept.description,
+        sla_hours: dept.sla_hours,
+        // Official Contact & Authority Info for State and District
+        authority_name: auth.authorityName || dept.name,
+        office_title: auth.office || `${dept.name} Division`,
+        office_address: auth.address || `${selectedDistrict ? selectedDistrict + ', ' : ''}${selectedState || 'India'}`,
+        contact_phone: auth.phone || dept.contact_phone || '1800-200-3532',
+        contact_email: auth.email || dept.contact_email || 'support@raise2resolve.gov',
+        website_url: auth.websiteUrl || 'https://india.gov.in',
+        directions_url: auth.directionsUrl || null,
+        jurisdiction_level: auth.jurisdictionLevel || 'District & Municipal Level',
+        distance_km: auth.distanceKm || null,
+        // Complaints Filed metrics
+        complaints_count: totalCount,
+        verified_complaints_count: verifiedCount,
+        resolved_complaints_count: resolvedCount,
+        pending_complaints_count: pendingCount,
+        in_progress_complaints_count: inProgressCount
+      };
+    });
+
+    return res.json({
+      success: true,
+      state: selectedState,
+      district: selectedDistrict,
+      total_complaints_in_district: complaintStats.length,
+      departments: departmentsWithDetails
+    });
+  } catch (error) {
+    console.error('Fetch departments by district error:', error);
+    return res.status(500).json({ success: false, message: 'Server error retrieving departments for district.' });
+  }
+});
+
 // GET /api/authorities
 router.get('/authorities', async (req, res) => {
   try {

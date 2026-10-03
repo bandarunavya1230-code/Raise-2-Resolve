@@ -1,10 +1,29 @@
 import React, { createContext, useState, useEffect } from 'react';
 
+// Safe localStorage helpers for iframe resilience
+const getStoredToken = () => {
+  try {
+    return localStorage.getItem('token') || null;
+  } catch (e) {
+    return null;
+  }
+};
+
+const setStoredToken = (val) => {
+  try {
+    if (val) {
+      localStorage.setItem('token', val);
+    } else {
+      localStorage.removeItem('token');
+    }
+  } catch (e) {}
+};
+
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  const [token, setToken] = useState(() => getStoredToken());
   const [loading, setLoading] = useState(true);
 
   // Fetch current user on initial load if token exists
@@ -42,7 +61,7 @@ export const AuthProvider = ({ children }) => {
     });
     const data = await response.json();
     if (data.success) {
-      localStorage.setItem('token', data.token);
+      setStoredToken(data.token);
       setToken(data.token);
       setUser(data.user);
     }
@@ -57,7 +76,7 @@ export const AuthProvider = ({ children }) => {
     });
     const data = await response.json();
     if (data.success) {
-      localStorage.setItem('token', data.token);
+      setStoredToken(data.token);
       setToken(data.token);
       setUser(data.user);
     }
@@ -70,7 +89,7 @@ export const AuthProvider = ({ children }) => {
     });
     const data = await response.json();
     if (data.success) {
-      localStorage.setItem('token', data.token);
+      setStoredToken(data.token);
       setToken(data.token);
       setUser(data.user);
     }
@@ -78,7 +97,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    setStoredToken(null);
     setToken(null);
     setUser(null);
   };

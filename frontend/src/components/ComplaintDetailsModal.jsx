@@ -26,6 +26,10 @@ export default function ComplaintDetailsModal({ complaintId, onClose, token, onS
   const [targetDeptId, setTargetDeptId] = useState('');
   const [reassignReason, setReassignReason] = useState('');
   
+  // Verify & Department Assignment state
+  const [verifyDeptId, setVerifyDeptId] = useState('');
+  const [verifyRemarks, setVerifyRemarks] = useState('');
+
   // Status update state
   const [newStatus, setNewStatus] = useState('in_progress');
   const [updateRemarks, setUpdateRemarks] = useState('');
@@ -42,6 +46,9 @@ export default function ComplaintDetailsModal({ complaintId, onClose, token, onS
 
       if (result.success) {
         setData(result.data);
+        if (result.data.department_id) {
+          setVerifyDeptId(String(result.data.department_id));
+        }
       } else {
         setError(result.message || 'Failed to load details.');
       }
@@ -63,11 +70,12 @@ export default function ComplaintDetailsModal({ complaintId, onClose, token, onS
 
   if (!complaintId) return null;
 
-  // 1. Verify Toggle Handler
+  // 1. Verify & Department Assignment Handler
   const handleVerify = async () => {
     setSubmittingAction(true);
     setActionMsg('');
     try {
+      const chosenDept = departments.find(d => String(d.id) === String(verifyDeptId));
       const res = await fetch(`/api/complaints/${complaintId}/verify`, {
         method: 'POST',
         headers: {
@@ -75,14 +83,19 @@ export default function ComplaintDetailsModal({ complaintId, onClose, token, onS
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          remarks: 'Official verification conducted by municipal authority.'
+          remarks: verifyRemarks || (chosenDept ? `Verified and assigned to ${chosenDept.name} for on-ground resolution.` : 'Official verification conducted by municipal authority.'),
+          department_id: chosenDept ? chosenDept.id : undefined,
+          department_name: chosenDept ? chosenDept.name : undefined
         })
       });
       const resData = await res.json();
       if (resData.success) {
         setActionMsg(resData.message);
+        setActiveAction('');
         fetchDetails();
         if (onSupportToggle) onSupportToggle();
+      } else {
+        setError(resData.message || 'Failed to update verification status.');
       }
     } catch (err) {
       setError('Failed to update verification status.');
@@ -267,7 +280,7 @@ export default function ComplaintDetailsModal({ complaintId, onClose, token, onS
 
               {data.is_verified === 1 && (
                 <span className="badge badge-verified">
-                  <ShieldCheck size={12} /> Verified
+                  <ShieldCheck size={12} /> Verified & Assigned: {data.department_name || 'Designated Department'}
                 </span>
               )}
 
@@ -411,15 +424,21 @@ export default function ComplaintDetailsModal({ complaintId, onClose, token, onS
                 </h4>
 
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-                  {/* Verify button */}
+                  {/* Verify & Assign button */}
                   <button
                     type="button"
-                    onClick={handleVerify}
+                    onClick={() => {
+                      if (data.is_verified) {
+                        handleVerify();
+                      } else {
+                        setActiveAction(activeAction === 'verify' ? '' : 'verify');
+                      }
+                    }}
                     className="btn btn-teal"
                     style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}
                     disabled={submittingAction}
                   >
-                    <ShieldCheck size={15} /> {data.is_verified ? 'Revoke Verification' : 'Verify Report'}
+                    <ShieldCheck size={15} /> {data.is_verified ? 'Revoke Verification' : 'Verify & Assign Department'}
                   </button>
 
                   {/* Assign button */}
@@ -452,6 +471,72 @@ export default function ComplaintDetailsModal({ complaintId, onClose, token, onS
                     <Wrench size={15} /> Update Progress / Resolve
                   </button>
                 </div>
+
+                {/* Sub-form: Verify and Assign to Particular Department */}
+                {activeAction === 'verify' && !data.is_verified && (
+                  <form onSubmit={(e) => { e.preventDefault(); handleVerify(); }} style={{ backgroundColor: '#F0FDFA', padding: '1.15rem', borderRadius: '10px', border: '1px solid #CCFBF1', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0F766E', fontWeight: '700', fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+                      <ShieldCheck size={17} color="#0D9488" />
+                      <span>Official Verification & Department Assignment</span>
+                    </div>
+                    <p style={{ fontSize: '0.8rem', color: '#64748B', marginBottom: '0.85rem' }}>
+                      After verification, this issue is officially assigned to the selected municipal department responsible for execution.
+                    </p>
+
+                    <div className="form-group" style={{ marginBottom: '0.85rem' }}>
+                      <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155' }}>
+                        Assign to Department *
+                      </label>
+                      <select
+                        value={verifyDeptId}
+                        onChange={(e) => setVerifyDeptId(e.target.value)}
+                        className="form-control"
+                        required
+                        style={{ fontSize: '0.85rem' }}
+                      >
+                        <option value="">-- Choose Respective Department --</option>
+                        {departments.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name} ({d.category})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: '0.85rem' }}>
+                      <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155' }}>
+                        Verification Notes / Remarks (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Physical on-ground verification complete. Dispatched to department head."
+                        value={verifyRemarks}
+                        onChange={(e) => setVerifyRemarks(e.target.value)}
+                        className="form-control"
+                        style={{ fontSize: '0.85rem' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveAction('')}
+                        className="btn btn-secondary"
+                        style={{ padding: '0.4rem 0.85rem', fontSize: '0.85rem' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submittingAction || !verifyDeptId}
+                        className="btn btn-teal"
+                        style={{ padding: '0.45rem 1rem', fontSize: '0.85rem', fontWeight: '700' }}
+                      >
+                        Confirm Verification & Assign Department
+                      </button>
+                    </div>
+                  </form>
+                )}
 
                 {/* Sub-form: Assign Field Crew */}
                 {activeAction === 'assign' && (

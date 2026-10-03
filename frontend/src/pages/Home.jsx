@@ -162,22 +162,41 @@ export default function Home() {
       }}>
         <div className="container" style={{ textAlign: 'center', maxWidth: '920px' }}>
           
-          {/* Civic Badge */}
+          {/* Big Emblem & Brand Tag */}
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.45rem',
-            backgroundColor: '#EFF6FF',
-            color: '#2563EB',
-            border: '1px solid #BFDBFE',
-            padding: '0.4rem 1.25rem',
+            gap: '0.85rem',
+            backgroundColor: '#FFFFFF',
+            border: '1.5px solid #BFDBFE',
+            padding: '0.4rem 1.35rem 0.4rem 0.5rem',
             borderRadius: '9999px',
-            fontSize: '0.85rem',
-            fontWeight: '700',
             marginBottom: '1.5rem',
-            boxShadow: '0 1px 3px rgba(37, 99, 235, 0.08)'
+            boxShadow: '0 4px 14px rgba(37, 99, 235, 0.1)'
           }}>
-            <ShieldCheck size={17} color="#2563EB" /> Public Civic Resolution & Department Routing Platform
+            <img
+              src="/logo.jpg"
+              alt="Raise 2 Resolve Logo"
+              referrerPolicy="no-referrer"
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '50%',
+                objectFit: 'cover',
+                border: '1.5px solid #93C5FD',
+                boxShadow: '0 2px 6px rgba(37, 99, 235, 0.2)'
+              }}
+            />
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              lineHeight: '1'
+            }}>
+              <span style={{ fontWeight: '900', fontSize: '1.15rem', color: '#0F172A', letterSpacing: '-0.02em' }}>RAISE</span>
+              <span style={{ fontWeight: '950', fontSize: '1.75rem', color: '#2563EB', lineHeight: '0.8', margin: '0', padding: '0 1px' }}>2</span>
+              <span style={{ fontWeight: '900', fontSize: '1.15rem', color: '#0284C7', letterSpacing: '-0.02em' }}>RESOLVE</span>
+              <span style={{ fontSize: '0.825rem', color: '#64748B', fontWeight: '600', marginLeft: '0.65rem' }}>· Public Civic Platform</span>
+            </div>
           </div>
 
           {/* Hero Heading */}
@@ -528,72 +547,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 5. CIVIC DEPARTMENTS DIRECTORY (Requirement 3) */}
-      <section id="departments" className="container" style={{ padding: '3.5rem 1.5rem' }}>
-        <div className="section-header">
-          <div className="section-tag">
-            <Building2 size={14} /> Department Routing
-          </div>
-          <h2 className="section-title">Automated Department Directory</h2>
-          <p className="section-subtitle">
-            Every issue is automatically mapped to its specialized civic department with designated service level agreements (SLAs).
-          </p>
-        </div>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '1.25rem'
-        }}>
-          {departments.map((d) => {
-            const IconComponent = departmentIcons[d.category] || Building2;
-            const openCount = complaints.filter(c => c.department_name === d.name && c.status !== 'resolved').length;
-            return (
-              <div key={d.id} className="card card-hover" style={{ backgroundColor: '#FFFFFF', padding: '1.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
-                  <div style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '8px',
-                    backgroundColor: '#EFF6FF',
-                    color: '#2563EB',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <IconComponent size={20} />
-                  </div>
-                  <span className="badge badge-dept" style={{ fontSize: '0.72rem' }}>
-                    SLA: {d.sla_hours || 48}h
-                  </span>
-                </div>
-
-                <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#0F172A', marginBottom: '0.35rem' }}>
-                  {d.name}
-                </h4>
-                <p style={{ color: '#64748B', fontSize: '0.825rem', lineHeight: '1.5', marginBottom: '0.85rem' }}>
-                  {d.description}
-                </p>
-
-                <div style={{
-                  borderTop: '1px solid #F1F5F9',
-                  paddingTop: '0.65rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  fontSize: '0.78rem',
-                  color: '#64748B'
-                }}>
-                  <span>Active Queue: <strong>{openCount}</strong></span>
-                  <span style={{ color: '#0284C7', fontWeight: '600' }}>📞 {d.contact_phone || 'Helpline'}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* 6. COMMUNITY ISSUES FEED */}
+      {/* 5. COMMUNITY ISSUES FEED */}
       <section id="community-feed" className="container" style={{ paddingTop: '1rem' }}>
         
         {/* Feed Header */}
