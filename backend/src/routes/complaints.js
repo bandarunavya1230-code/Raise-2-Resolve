@@ -6,6 +6,7 @@ const { getDB } = require('../config/db');
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const { calculatePriority } = require('../utils/priority');
 const { resolveAuthorityAndDepartment, getDepartmentForCategory } = require('../utils/authorityResolver');
+const { resolveVerifiedAuthority } = require('../data/verifiedAuthorityDirectory');
 
 // Helper to derive GIS coordinates
 function getCoordinatesForLocation(locationStr = '', id = 1) {
@@ -276,6 +277,78 @@ router.post('/check-similar', async (req, res) => {
   }
 });
 
+// GET /api/complaints/track/:code
+// Dedicated endpoint to track a complaint by its ticket code (e.g. R2R-2026-0001 or numeric ID)
+router.get('/track/:code', async (req, res) => {
+  try {
+    const rawCode = (req.params.code || '').trim();
+    if (!rawCode) {
+      return res.status(400).json({ success: false, message: 'Complaint tracking code is required.' });
+    }
+
+    const db = await getDB();
+    const queryTerm = rawCode.toLowerCase();
+
+    // Match by complaint_code, formatted R2R code, or numeric ID
+    const complaint = await db.get(`
+      SELECT c.*, u.name as author_name, u.email as author_email,
+        (SELECT COUNT(*) FROM complaint_support cs WHERE cs.complaint_id = c.id) as support_count
+      FROM complaints c
+      JOIN users u ON c.user_id = u.id
+      WHERE LOWER(c.complaint_code) = ?
+         OR LOWER(c.complaint_code) = LOWER(?)
+         OR c.id = ?
+         OR LOWER(c.complaint_code) LIKE ?
+      LIMIT 1
+    `, [queryTerm, `R2R-2026-${queryTerm.replace(/^r2r-2026-/, '')}`, parseInt(rawCode, 10) || -1, `%${queryTerm}%`]);
+
+    if (!complaint) {
+      return res.status(404).json({ 
+        success: false, 
+        message: `No complaint found matching tracking code "${rawCode}". Please check your Ticket ID.` 
+      });
+    }
+
+    const updates = await db.all(`
+      SELECT au.*, u.name as official_name
+      FROM authority_updates au
+      JOIN users u ON au.official_id = u.id
+      WHERE au.complaint_id = ?
+      ORDER BY au.created_at ASC
+    `, [complaint.id]);
+
+    const reassignments = await db.all(`
+      SELECT cr.*, u.name as reassigned_by_name
+      FROM complaint_reassignments cr
+      JOIN users u ON cr.reassigned_by = u.id
+      WHERE cr.complaint_id = ?
+      ORDER BY cr.created_at ASC
+    `, [complaint.id]);
+
+    const p = calculatePriority(complaint.severity, complaint.category, complaint.support_count, complaint.created_at);
+    const coords = (complaint.latitude && complaint.longitude) 
+      ? { latitude: complaint.latitude, longitude: complaint.longitude } 
+      : getCoordinatesForLocation(complaint.location, complaint.id);
+
+    return res.json({
+      success: true,
+      data: {
+        ...complaint,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        priority_score: p.priorityScore,
+        priority_level: p.priorityLevel,
+        priority_reason: p.priorityReason,
+        updates,
+        reassignments
+      }
+    });
+  } catch (error) {
+    console.error('Track complaint error:', error);
+    return res.status(500).json({ success: false, message: 'Server error while tracking complaint.' });
+  }
+});
+
 // GET /api/complaints/:id
 router.get('/:id', async (req, res) => {
   try {
@@ -389,7 +462,14 @@ router.post('/', authenticateToken, (req, res, next) => {
       district,
       city_town_village,
       ward_area,
-      location_type
+      location_type,
+      authority_name,
+      authority_contact,
+      jurisdiction_level,
+      office_address,
+      official_portal,
+      official_website,
+      department_name
     } = req.body;
 
     if (!title || !description || !category || !location) {
@@ -403,49 +483,61 @@ router.post('/', authenticateToken, (req, res, next) => {
 
     const db = await getDB();
 
-    // Automatic Department & Authority Resolution
-    const routing = await resolveAuthorityAndDepartment(db, {
-      category,
+    // Check if verified authority was selected or resolve dynamically
+    const verifiedAuth = resolveVerifiedAuthority({
       state: state || 'Karnataka',
       district: district || 'Bengaluru Urban',
-      city_town_village: city_town_village || 'Bengaluru (City)',
-      ward_area: ward_area || 'Ward 82 - Indiranagar',
-      location_type: location_type || 'city',
-      latitude: latitude ? parseFloat(latitude) : null,
-      longitude: longitude ? parseFloat(longitude) : null
+      ward: ward_area || null,
+      category,
+      lat: latitude ? parseFloat(latitude) : null,
+      lng: longitude ? parseFloat(longitude) : null
     });
+
+    const finalAuthorityName = authority_name || verifiedAuth.authorityName || 'Central Municipal Grievance Desk';
+    const finalDepartmentName = department_name || verifiedAuth.department || category;
+    const finalContact = authority_contact || verifiedAuth.phone || '1800-200-3532';
+    const finalJurisdiction = jurisdiction_level || verifiedAuth.jurisdictionLevel || 'District Level';
+    const finalOfficeAddress = office_address || verifiedAuth.address || '';
+    const finalPortal = official_portal || verifiedAuth.portalUrl || '';
+    const finalWebsite = official_website || verifiedAuth.websiteUrl || '';
+
+    // Match department ID if present
+    const deptRecord = await db.get('SELECT id FROM departments WHERE name = ? OR category = ? LIMIT 1', [finalDepartmentName, category]);
+    const deptId = deptRecord ? deptRecord.id : null;
 
     const result = await db.run(`
       INSERT INTO complaints (
         title, description, category, severity, location, latitude, longitude, status, image_url, user_id, 
-        priority_score, priority_reason, department_id, department_name, authority_id, authority_name, 
+        priority_score, priority_reason, department_id, department_name, authority_name, 
         authority_contact, jurisdiction_level, state, district, city_town_village, location_type, ward_area, 
-        verification_status
+        verification_status, office_address, official_portal, official_website
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unverified')
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unverified', ?, ?, ?)
     `, [
       title.trim(), 
       description.trim(), 
       category, 
       itemSeverity, 
       location.trim(), 
-      latitude ? parseFloat(latitude) : null,
-      longitude ? parseFloat(longitude) : null,
+      latitude ? parseFloat(latitude) : (verifiedAuth.latitude || null), 
+      longitude ? parseFloat(longitude) : (verifiedAuth.longitude || null), 
       image_url, 
       req.user.id, 
       priorityScore, 
       priorityReason,
-      routing.department_id,
-      routing.department_name,
-      routing.authority_id,
-      routing.authority_name,
-      routing.authority_contact,
-      routing.jurisdiction_level,
+      deptId,
+      finalDepartmentName,
+      finalAuthorityName,
+      finalContact,
+      finalJurisdiction,
       state || 'Karnataka',
       district || 'Bengaluru Urban',
       city_town_village || 'Bengaluru (City)',
       location_type || 'city',
-      ward_area || 'Ward 82 - Indiranagar'
+      ward_area || 'Ward 82 - Indiranagar',
+      finalOfficeAddress,
+      finalPortal,
+      finalWebsite
     ]);
 
     const complaintId = result.lastID;
@@ -453,8 +545,8 @@ router.post('/', authenticateToken, (req, res, next) => {
     const complaintCode = `R2R-2026-${codeNumber}`;
 
     const derivedCoords = getCoordinatesForLocation(location, complaintId);
-    const finalLat = latitude ? parseFloat(latitude) : derivedCoords.latitude;
-    const finalLng = longitude ? parseFloat(longitude) : derivedCoords.longitude;
+    const finalLat = latitude ? parseFloat(latitude) : (verifiedAuth.latitude || derivedCoords.latitude);
+    const finalLng = longitude ? parseFloat(longitude) : (verifiedAuth.longitude || derivedCoords.longitude);
 
     await db.run(
       'UPDATE complaints SET complaint_code = ?, latitude = ?, longitude = ? WHERE id = ?',
@@ -468,14 +560,14 @@ router.post('/', authenticateToken, (req, res, next) => {
     `, [
       complaintId,
       req.user.id,
-      `Complaint registered and auto-routed to ${routing.department_name} under ${routing.jurisdiction_level} (${routing.authority_name}).`
+      `Complaint registered and auto-routed to ${finalDepartmentName} under ${finalJurisdiction} (${finalAuthorityName}).`
     ]);
 
     const newComplaint = await db.get('SELECT * FROM complaints WHERE id = ?', [complaintId]);
 
     return res.status(201).json({
       success: true,
-      message: `Complaint submitted and routed to ${routing.department_name}!`,
+      message: `Complaint submitted and routed to ${finalDepartmentName}!`,
       data: {
         ...newComplaint,
         latitude: finalLat,

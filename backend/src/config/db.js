@@ -183,7 +183,10 @@ async function getDB() {
     { name: 'verified_by', def: 'INTEGER' },
     { name: 'assigned_to', def: 'TEXT' },
     { name: 'assigned_at', def: 'DATETIME' },
-    { name: 'reassignment_count', def: 'INTEGER DEFAULT 0' }
+    { name: 'reassignment_count', def: 'INTEGER DEFAULT 0' },
+    { name: 'office_address', def: 'TEXT' },
+    { name: 'official_portal', def: 'TEXT' },
+    { name: 'official_website', def: 'TEXT' }
   ];
 
   for (const col of complaintColumns) {
