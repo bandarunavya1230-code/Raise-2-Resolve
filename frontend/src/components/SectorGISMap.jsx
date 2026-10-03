@@ -14,28 +14,36 @@ export default function SectorGISMap({ complaints = [], onSelectComplaint }) {
   // Categories list
   const sectors = [
     'ALL',
-    'Roads & Potholes',
+    'Electricity',
     'Water Supply',
-    'Waste Management',
-    'Electricity & Lighting',
-    'Drainage & Sewage',
-    'Public Safety'
+    'Roads/Public Works',
+    'Sanitation/Waste Management',
+    'Streetlights',
+    'Drainage',
+    'Public Safety',
+    'Other'
   ];
 
   // Filter complaints by selected sector
   const filteredComplaints = complaints.filter(c => {
     if (selectedSector === 'ALL') return true;
-    return c.category === selectedSector;
+    return c.category === selectedSector || (c.category && c.category.toLowerCase().includes(selectedSector.toLowerCase().split('/')[0]));
   });
 
   // Sector Color Mapping
   const sectorColors = {
-    'Roads & Potholes': '#f59e0b',
+    'Electricity': '#eab308',
     'Water Supply': '#0284c7',
-    'Waste Management': '#84cc16',
-    'Electricity & Lighting': '#eab308',
-    'Drainage & Sewage': '#78716c',
-    'Public Safety': '#dc2626'
+    'Roads/Public Works': '#f59e0b',
+    'Roads & Potholes': '#f59e0b',
+    'Sanitation/Waste Management': '#14b8a6',
+    'Waste Management': '#14b8a6',
+    'Streetlights': '#38bdf8',
+    'Electricity & Lighting': '#38bdf8',
+    'Drainage': '#64748b',
+    'Drainage & Sewage': '#64748b',
+    'Public Safety': '#dc2626',
+    'Other': '#8b5cf6'
   };
 
   // Initialize Leaflet Map with Safe Fallback

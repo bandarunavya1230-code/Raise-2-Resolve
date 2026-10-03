@@ -8,6 +8,7 @@ const { getDB } = require('./backend/src/config/db');
 const healthRoutes = require('./backend/src/routes/health');
 const authRoutes = require('./backend/src/routes/auth');
 const complaintRoutes = require('./backend/src/routes/complaints');
+const locationRoutes = require('./backend/src/routes/locations');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,6 +32,7 @@ app.use('/uploads', express.static(uploadsDir));
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/complaints', complaintRoutes);
+app.use('/api', locationRoutes);
 
 // Setup frontend serving
 async function setupFrontend() {

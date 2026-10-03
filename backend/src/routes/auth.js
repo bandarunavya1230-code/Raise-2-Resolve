@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const { getDB } = require('../config/db');
 const { authenticateToken } = require('../middleware/auth');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'buildion_raise2resolve_super_secret_jwt_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET || 'raise2resolve_super_secret_jwt_key_2026';
 
 // Helper to generate JWT token
 function generateToken(user) {
@@ -120,18 +120,18 @@ router.post('/login', async (req, res) => {
 router.post('/demo-authority', async (req, res) => {
   try {
     const db = await getDB();
-    let authorityUser = await db.get('SELECT * FROM users WHERE email = ?', ['authority@buildion.gov']);
+    let authorityUser = await db.get('SELECT * FROM users WHERE email = ? OR email = ?', ['authority@raise2resolve.gov', 'authority@buildion.gov']);
 
     if (!authorityUser) {
       const hashedPassword = await bcrypt.hash('authority123', 10);
       const result = await db.run(
         'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
-        ['Municipal Admin Officer', 'authority@buildion.gov', hashedPassword, 'authority']
+        ['Municipal Admin Officer', 'authority@raise2resolve.gov', hashedPassword, 'authority']
       );
       authorityUser = {
         id: result.lastID,
         name: 'Municipal Admin Officer',
-        email: 'authority@buildion.gov',
+        email: 'authority@raise2resolve.gov',
         role: 'authority'
       };
     }

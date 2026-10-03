@@ -1,6 +1,6 @@
-# BUILDION – Raise 2 Resolve
+# Raise 2 Resolve
 
-**BUILDION – Raise 2 Resolve** is a full-stack civic issues resolution hackathon prototype. It enables citizens to report local infrastructure issues (potholes, streetlights, drainage, waste management) with photo evidence while using an automated priority calculation algorithm and duplicate detection engine to streamline municipal authority resolution.
+**Raise 2 Resolve** is a full-stack civic issues resolution hackathon platform. It enables citizens to report local infrastructure issues (potholes, streetlights, drainage, waste management) with photo evidence while using an automated department routing and location jurisdiction assignment engine.
 
 ---
 
@@ -33,7 +33,7 @@
 
 ## 🛠️ Stack & Architecture
 
-- **Frontend**: React (v18), Vite, JavaScript, CSS3 (BUILDION Blue/White theme), React Router (v6), Lucide Icons, Leaflet, jsPDF, jsPDF-AutoTable
+- **Frontend**: React (v18), Vite, JavaScript, Tailwind/CSS3 (Civic Sky Blue & White theme), React Router (v6), Lucide Icons, Leaflet, jsPDF, jsPDF-AutoTable
 - **Backend**: Node.js, Express.js
 - **Database**: SQLite3 (`database.sqlite`)
 - **Libraries**: JWT (`jsonwebtoken`), Password Hashing (`bcryptjs`), File Uploads (`multer`), `cors`, `dotenv`
@@ -53,8 +53,8 @@
 
 | Role | Email | Password | Quick Login |
 | --- | --- | --- | --- |
-| **Authority** | `authority@buildion.gov` | `authority123` | Click **"Demo Authority"** in Navbar |
-| **Citizen** | `citizen@buildion.org` | `citizen123` | Form login or register new account |
+| **Authority** | `authority@raise2resolve.gov` | `authority123` | Click **"Demo Authority"** in Navbar |
+| **Citizen** | `citizen@raise2resolve.gov` | `citizen123` | Form login or register new account |
 
 ---
 

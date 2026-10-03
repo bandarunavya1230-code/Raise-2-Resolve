@@ -5,6 +5,7 @@ const path = require('path');
 const { getDB } = require('../config/db');
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const { calculatePriority } = require('../utils/priority');
+const { resolveAuthorityAndDepartment, getDepartmentForCategory } = require('../utils/authorityResolver');
 
 // Helper to derive GIS coordinates
 function getCoordinatesForLocation(locationStr = '', id = 1) {
@@ -26,11 +27,13 @@ function getCoordinatesForLocation(locationStr = '', id = 1) {
 }
 
 // Helper to construct simulated Email & SMS notifications
-function createSimulatedNotifications(complaint, author, nextStatus, updateText) {
+function createSimulatedNotifications(complaint, author, nextStatus, updateText, customSubject) {
   const code = complaint.complaint_code || `R2R-2026-${String(complaint.id).padStart(4, '0')}`;
   const citizenName = author ? author.name : 'Valued Citizen';
-  const citizenEmail = author ? author.email : 'citizen@buildion.org';
-  const citizenPhone = '+1 (555) 019-2834';
+  const citizenEmail = author ? author.email : 'citizen@raise2resolve.gov';
+  const citizenPhone = '+91 (800) 200-3532';
+
+  const statusLabel = nextStatus.toUpperCase().replace('_', ' ');
 
   return {
     id: 'SIM-' + Date.now(),
@@ -45,13 +48,13 @@ function createSimulatedNotifications(complaint, author, nextStatus, updateText)
     email: {
       label: '[SIMULATED EMAIL NOTIFICATION]',
       to: citizenEmail,
-      subject: `[Raise 2 Resolve] Ticket #${code} Status Update: ${nextStatus.toUpperCase().replace('_', ' ')}`,
-      body: `Hello ${citizenName},\n\nThe status of your reported civic complaint #${code} (${complaint.title}) at "${complaint.location}" has been updated to "${nextStatus.toUpperCase().replace('_', ' ')}".\n\nOfficial Municipal Remark:\n"${updateText}"\n\nYou can track step-by-step progress on your Raise 2 Resolve Citizen Dashboard.\n\nRegards,\nRaise 2 Resolve Municipal Authority`
+      subject: customSubject || `[Raise 2 Resolve] Ticket #${code} Status Update: ${statusLabel}`,
+      body: `Hello ${citizenName},\n\nYour civic complaint #${code} ("${complaint.title}") located at "${complaint.location}" has an official status update.\n\nCurrent Department: ${complaint.department_name || 'Municipal Works'}\nStatus: ${statusLabel}\n\nOfficial Municipal Remark:\n"${updateText}"\n\nYou can track the full resolution timeline on your Raise 2 Resolve Citizen Dashboard.\n\nRegards,\nRaise 2 Resolve Municipal Authority`
     },
     sms: {
       label: '[SIMULATED SMS NOTIFICATION]',
       to: citizenPhone,
-      body: `[R2R Alert] Ticket #${code} status is now ${nextStatus.toUpperCase().replace('_', ' ')}. Remark: ${updateText.length > 70 ? updateText.slice(0, 70) + '...' : updateText}`
+      body: `[R2R Alert] Ticket #${code} is now ${statusLabel}. Dept: ${complaint.department_name || 'Municipal'}. Remark: ${updateText.length > 60 ? updateText.slice(0, 60) + '...' : updateText}`
     }
   };
 }
@@ -101,14 +104,52 @@ async function refreshComplaintPriority(db, complaintId) {
 // GET /api/complaints
 router.get('/', async (req, res) => {
   try {
+    const { department, status, jurisdiction, state, district, city } = req.query;
     const db = await getDB();
-    const rawComplaints = await db.all(`
+
+    let query = `
       SELECT c.*, u.name as author_name,
         (SELECT COUNT(*) FROM complaint_support cs WHERE cs.complaint_id = c.id) as support_count
       FROM complaints c
       JOIN users u ON c.user_id = u.id
-      ORDER BY c.priority_score DESC, c.created_at DESC
-    `);
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (department && department !== 'All') {
+      query += ' AND c.department_name = ?';
+      params.push(department);
+    }
+    if (status && status !== 'All') {
+      if (status === 'verified') {
+        query += ' AND (c.verification_status = "verified" OR c.is_verified = 1)';
+      } else if (status === 'unverified') {
+        query += ' AND (c.verification_status = "unverified" AND c.is_verified = 0)';
+      } else if (status === 'assigned') {
+        query += ' AND c.status = "assigned"';
+      } else if (status === 'rejected') {
+        query += ' AND (c.status = "rejected" OR c.is_flagged = 1)';
+      } else {
+        query += ' AND c.status = ?';
+        params.push(status);
+      }
+    }
+    if (state) {
+      query += ' AND c.state = ?';
+      params.push(state);
+    }
+    if (district) {
+      query += ' AND c.district = ?';
+      params.push(district);
+    }
+    if (city) {
+      query += ' AND c.city_town_village = ?';
+      params.push(city);
+    }
+
+    query += ' ORDER BY c.priority_score DESC, c.created_at DESC';
+
+    const rawComplaints = await db.all(query, params);
 
     const complaints = rawComplaints.map(c => {
       const p = calculatePriority(c.severity, c.category, c.support_count, c.created_at);
@@ -165,39 +206,47 @@ router.get('/my', authenticateToken, async (req, res) => {
     return res.json({ success: true, data: complaints });
   } catch (error) {
     console.error('Fetch my complaints error:', error);
-    return res.status(500).json({ success: false, message: 'Server error fetching your complaints.' });
+    return res.status(500).json({ success: false, message: 'Server error fetching user complaints.' });
   }
 });
 
 // POST /api/complaints/check-similar
 router.post('/check-similar', async (req, res) => {
   try {
-    const { category, location, title } = req.body;
+    const { category, location, title, ward_area, city_town_village } = req.body;
+
     if (!category && !location && !title) {
-      return res.json({ success: true, matches: [] });
+      return res.json({ success: true, hasSimilar: false, matches: [] });
     }
 
     const db = await getDB();
-    const allComplaints = await db.all(`
-      SELECT c.*, u.name as author_name,
-        (SELECT COUNT(*) FROM complaint_support cs WHERE cs.complaint_id = c.id) as support_count
+    const complaints = await db.all(`
+      SELECT c.*, (SELECT COUNT(*) FROM complaint_support cs WHERE cs.complaint_id = c.id) as support_count
       FROM complaints c
-      JOIN users u ON c.user_id = u.id
-      WHERE c.status != 'resolved' AND c.is_flagged = 0
+      WHERE c.status != 'resolved' AND c.status != 'rejected'
+      ORDER BY c.created_at DESC
+      LIMIT 50
     `);
 
-    const locationKeywords = (location || '').toLowerCase().split(/\s+/).filter(w => w.length > 3);
-    const titleKeywords = (title || '').toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    const matches = complaints.filter(c => {
+      const categoryMatch = c.category && category && (
+        c.category.toLowerCase().includes(category.toLowerCase()) || 
+        category.toLowerCase().includes(c.category.toLowerCase())
+      );
+      
+      const loc1 = (c.location || '').toLowerCase();
+      const loc2 = (location || '').toLowerCase();
+      const locMatch = (loc1 && loc2) && (loc1.includes(loc2) || loc2.includes(loc1));
 
-    const matches = allComplaints.filter(c => {
-      const categoryMatch = c.category.toLowerCase() === (category || '').toLowerCase();
-      const targetLoc = c.location.toLowerCase();
-      const targetTitle = c.title.toLowerCase();
+      const wardMatch = ward_area && c.ward_area && (
+        c.ward_area.toLowerCase() === ward_area.toLowerCase()
+      );
 
-      const locMatch = locationKeywords.some(kw => targetLoc.includes(kw));
-      const titleMatch = titleKeywords.some(kw => targetTitle.includes(kw));
+      const titleWords1 = (c.title || '').toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      const titleWords2 = (title || '').toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      const titleMatch = titleWords1.some(w => titleWords2.includes(w));
 
-      return (categoryMatch && (locMatch || titleMatch)) || (locMatch && titleMatch);
+      return (categoryMatch && (locMatch || wardMatch || titleMatch)) || (locMatch && titleMatch);
     });
 
     const formattedMatches = matches.map(c => {
@@ -251,6 +300,14 @@ router.get('/:id', async (req, res) => {
       ORDER BY au.created_at ASC
     `, [req.params.id]);
 
+    const reassignments = await db.all(`
+      SELECT cr.*, u.name as reassigned_by_name
+      FROM complaint_reassignments cr
+      JOIN users u ON cr.reassigned_by = u.id
+      WHERE cr.complaint_id = ?
+      ORDER BY cr.created_at ASC
+    `, [req.params.id]);
+
     const p = calculatePriority(complaint.severity, complaint.category, complaint.support_count, complaint.created_at);
     const coords = (complaint.latitude && complaint.longitude) 
       ? { latitude: complaint.latitude, longitude: complaint.longitude } 
@@ -265,7 +322,8 @@ router.get('/:id', async (req, res) => {
         priority_score: p.priorityScore,
         priority_level: p.priorityLevel,
         priority_reason: p.priorityReason,
-        updates
+        updates,
+        reassignments
       }
     });
   } catch (error) {
@@ -274,7 +332,40 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/complaints
+// GET /api/complaints/:id/history (Full Audit Trail)
+router.get('/:id/history', async (req, res) => {
+  try {
+    const db = await getDB();
+    const complaintId = req.params.id;
+
+    const updates = await db.all(`
+      SELECT au.id, au.created_at, au.update_text, au.status_change, au.action_type, u.name as actor_name, u.role as actor_role
+      FROM authority_updates au
+      LEFT JOIN users u ON au.official_id = u.id
+      WHERE au.complaint_id = ?
+      ORDER BY au.created_at ASC
+    `, [complaintId]);
+
+    const reassignments = await db.all(`
+      SELECT cr.id, cr.created_at, cr.from_department_name, cr.to_department_name, cr.reason, u.name as actor_name, u.role as actor_role
+      FROM complaint_reassignments cr
+      LEFT JOIN users u ON cr.reassigned_by = u.id
+      WHERE cr.complaint_id = ?
+      ORDER BY cr.created_at ASC
+    `, [complaintId]);
+
+    return res.json({
+      success: true,
+      updates,
+      reassignments
+    });
+  } catch (error) {
+    console.error('Audit history error:', error);
+    return res.status(500).json({ success: false, message: 'Server error fetching audit history.' });
+  }
+});
+
+// POST /api/complaints (Create new complaint with automatic department & location routing)
 router.post('/', authenticateToken, (req, res, next) => {
   upload.single('image')(req, res, (err) => {
     if (err instanceof multer.MulterError) {
@@ -286,7 +377,20 @@ router.post('/', authenticateToken, (req, res, next) => {
   });
 }, async (req, res) => {
   try {
-    const { title, description, category, severity, location, latitude, longitude } = req.body;
+    const { 
+      title, 
+      description, 
+      category, 
+      severity, 
+      location, 
+      latitude, 
+      longitude,
+      state,
+      district,
+      city_town_village,
+      ward_area,
+      location_type
+    } = req.body;
 
     if (!title || !description || !category || !location) {
       return res.status(400).json({ success: false, message: 'Title, description, category, and location are required.' });
@@ -299,9 +403,26 @@ router.post('/', authenticateToken, (req, res, next) => {
 
     const db = await getDB();
 
+    // Automatic Department & Authority Resolution
+    const routing = await resolveAuthorityAndDepartment(db, {
+      category,
+      state: state || 'Karnataka',
+      district: district || 'Bengaluru Urban',
+      city_town_village: city_town_village || 'Bengaluru (City)',
+      ward_area: ward_area || 'Ward 82 - Indiranagar',
+      location_type: location_type || 'city',
+      latitude: latitude ? parseFloat(latitude) : null,
+      longitude: longitude ? parseFloat(longitude) : null
+    });
+
     const result = await db.run(`
-      INSERT INTO complaints (title, description, category, severity, location, latitude, longitude, status, image_url, user_id, priority_score, priority_reason)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
+      INSERT INTO complaints (
+        title, description, category, severity, location, latitude, longitude, status, image_url, user_id, 
+        priority_score, priority_reason, department_id, department_name, authority_id, authority_name, 
+        authority_contact, jurisdiction_level, state, district, city_town_village, location_type, ward_area, 
+        verification_status
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unverified')
     `, [
       title.trim(), 
       description.trim(), 
@@ -313,7 +434,18 @@ router.post('/', authenticateToken, (req, res, next) => {
       image_url, 
       req.user.id, 
       priorityScore, 
-      priorityReason
+      priorityReason,
+      routing.department_id,
+      routing.department_name,
+      routing.authority_id,
+      routing.authority_name,
+      routing.authority_contact,
+      routing.jurisdiction_level,
+      state || 'Karnataka',
+      district || 'Bengaluru Urban',
+      city_town_village || 'Bengaluru (City)',
+      location_type || 'city',
+      ward_area || 'Ward 82 - Indiranagar'
     ]);
 
     const complaintId = result.lastID;
@@ -329,11 +461,21 @@ router.post('/', authenticateToken, (req, res, next) => {
       [complaintCode, finalLat, finalLng, complaintId]
     );
 
+    // Initial Submission audit log
+    await db.run(`
+      INSERT INTO authority_updates (complaint_id, official_id, update_text, status_change, action_type)
+      VALUES (?, ?, ?, 'pending', 'submission')
+    `, [
+      complaintId,
+      req.user.id,
+      `Complaint registered and auto-routed to ${routing.department_name} under ${routing.jurisdiction_level} (${routing.authority_name}).`
+    ]);
+
     const newComplaint = await db.get('SELECT * FROM complaints WHERE id = ?', [complaintId]);
 
     return res.status(201).json({
       success: true,
-      message: 'Complaint submitted with automated priority calculation & GIS coordinates!',
+      message: `Complaint submitted and routed to ${routing.department_name}!`,
       data: {
         ...newComplaint,
         latitude: finalLat,
@@ -348,7 +490,7 @@ router.post('/', authenticateToken, (req, res, next) => {
   }
 });
 
-// POST /api/complaints/:id/support
+// POST /api/complaints/:id/support (Community Upvote)
 router.post('/:id/support', authenticateToken, async (req, res) => {
   try {
     const complaintId = req.params.id;
@@ -390,10 +532,11 @@ router.post('/:id/support', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/complaints/:id/verify (With simulated notification)
+// POST /api/complaints/:id/verify (Authority Verification Step)
 router.post('/:id/verify', authenticateToken, authorizeRoles('authority'), async (req, res) => {
   try {
     const complaintId = req.params.id;
+    const { remarks } = req.body;
     const db = await getDB();
 
     const complaint = await db.get('SELECT * FROM complaints WHERE id = ?', [complaintId]);
@@ -402,24 +545,37 @@ router.post('/:id/verify', authenticateToken, authorizeRoles('authority'), async
     }
 
     const author = await db.get('SELECT name, email FROM users WHERE id = ?', [complaint.user_id]);
-    const newVerifyState = complaint.is_verified ? 0 : 1;
-    await db.run('UPDATE complaints SET is_verified = ? WHERE id = ?', [newVerifyState, complaintId]);
+    const newVerifyState = complaint.verification_status === 'verified' ? 'unverified' : 'verified';
+    const isVerifiedInt = newVerifyState === 'verified' ? 1 : 0;
+    const nextStatus = newVerifyState === 'verified' ? (complaint.status === 'pending' ? 'verified' : complaint.status) : 'pending';
 
-    const remarkText = newVerifyState 
-      ? 'Official Verification Complete: Field inspection verified civic issue validity.'
-      : 'Official Verification Status Revoked for review.';
+    await db.run(`
+      UPDATE complaints 
+      SET verification_status = ?,
+          is_verified = ?,
+          verified_at = CURRENT_TIMESTAMP,
+          verified_by = ?,
+          status = ?
+      WHERE id = ?
+    `, [newVerifyState, isVerifiedInt, req.user.id, nextStatus, complaintId]);
+
+    const remarkText = newVerifyState === 'verified'
+      ? (remarks || 'Official Verification Complete: Civic authority verified on-ground legitimacy and assigned priority.')
+      : 'Verification Status Revoked for administrative re-examination.';
 
     await db.run(`
       INSERT INTO authority_updates (complaint_id, official_id, update_text, status_change, action_type)
       VALUES (?, ?, ?, ?, 'verification')
-    `, [complaintId, req.user.id, remarkText, complaint.status]);
+    `, [complaintId, req.user.id, remarkText, nextStatus]);
 
-    const simulatedNotification = createSimulatedNotifications(complaint, author, complaint.status, remarkText);
+    const simulatedNotification = createSimulatedNotifications(complaint, author, nextStatus, remarkText);
 
     return res.json({
       success: true,
-      is_verified: newVerifyState === 1,
-      message: newVerifyState ? 'Report verified by municipal authority!' : 'Report verification revoked.',
+      verification_status: newVerifyState,
+      is_verified: isVerifiedInt === 1,
+      status: nextStatus,
+      message: newVerifyState === 'verified' ? 'Complaint verified by authority!' : 'Complaint marked unverified.',
       simulatedNotification
     });
   } catch (error) {
@@ -428,7 +584,168 @@ router.post('/:id/verify', authenticateToken, authorizeRoles('authority'), async
   }
 });
 
-// POST /api/complaints/:id/flag (With simulated notification)
+// POST /api/complaints/:id/assign (Assign Field Crew / Department Staff)
+router.post('/:id/assign', authenticateToken, authorizeRoles('authority'), async (req, res) => {
+  try {
+    const complaintId = req.params.id;
+    const { assigned_to, instructions } = req.body;
+
+    if (!assigned_to) {
+      return res.status(400).json({ success: false, message: 'Assigned personnel or team name is required.' });
+    }
+
+    const db = await getDB();
+    const complaint = await db.get('SELECT * FROM complaints WHERE id = ?', [complaintId]);
+    if (!complaint) {
+      return res.status(404).json({ success: false, message: 'Complaint not found.' });
+    }
+
+    const author = await db.get('SELECT name, email FROM users WHERE id = ?', [complaint.user_id]);
+
+    await db.run(`
+      UPDATE complaints 
+      SET assigned_to = ?,
+          assigned_at = CURRENT_TIMESTAMP,
+          status = 'assigned'
+      WHERE id = ?
+    `, [assigned_to.trim(), complaintId]);
+
+    const remarkText = `Work Assigned to: ${assigned_to.trim()}. Instructions: ${instructions || 'Field inspection & resolution dispatched.'}`;
+
+    await db.run(`
+      INSERT INTO authority_updates (complaint_id, official_id, update_text, status_change, action_type)
+      VALUES (?, ?, ?, 'assigned', 'assignment')
+    `, [complaintId, req.user.id, remarkText]);
+
+    const simulatedNotification = createSimulatedNotifications(complaint, author, 'assigned', remarkText);
+
+    return res.json({
+      success: true,
+      message: `Work crew successfully assigned to ${assigned_to}!`,
+      status: 'assigned',
+      assigned_to: assigned_to.trim(),
+      simulatedNotification
+    });
+  } catch (error) {
+    console.error('Assign error:', error);
+    return res.status(500).json({ success: false, message: 'Server error assigning work crew.' });
+  }
+});
+
+// POST /api/complaints/:id/reassign (Reassign to different department with Audit Trail)
+router.post('/:id/reassign', authenticateToken, authorizeRoles('authority'), async (req, res) => {
+  try {
+    const complaintId = req.params.id;
+    const { target_department_id, target_department_name, reason } = req.body;
+
+    if (!reason || (!target_department_id && !target_department_name)) {
+      return res.status(400).json({ success: false, message: 'Target department and reason for reassignment are required.' });
+    }
+
+    const db = await getDB();
+    const complaint = await db.get('SELECT * FROM complaints WHERE id = ?', [complaintId]);
+    if (!complaint) {
+      return res.status(404).json({ success: false, message: 'Complaint not found.' });
+    }
+
+    // Determine target department
+    let targetDept = null;
+    if (target_department_id) {
+      targetDept = await db.get('SELECT * FROM departments WHERE id = ?', [target_department_id]);
+    } else {
+      targetDept = await db.get('SELECT * FROM departments WHERE name = ?', [target_department_name]);
+    }
+
+    if (!targetDept) {
+      return res.status(400).json({ success: false, message: 'Selected target department is invalid.' });
+    }
+
+    // Re-resolve authority for new department in same location
+    const newAuthority = await db.get(`
+      SELECT * FROM authorities 
+      WHERE is_active = 1 
+        AND department_name = ? 
+        AND (city_town_village = ? OR district = ?)
+      LIMIT 1
+    `, [targetDept.name, complaint.city_town_village, complaint.district]) ||
+    await db.get('SELECT * FROM authorities WHERE department_name = ? LIMIT 1', [targetDept.name]) ||
+    await db.get('SELECT * FROM authorities WHERE is_active = 1 LIMIT 1');
+
+    const currentUser = await db.get('SELECT name FROM users WHERE id = ?', [req.user.id]);
+    const currentUserName = currentUser ? currentUser.name : 'Municipal Authority';
+
+    // 1. Record Audit Trail in complaint_reassignments
+    await db.run(`
+      INSERT INTO complaint_reassignments (
+        complaint_id, from_department_id, from_department_name, to_department_id, to_department_name, 
+        from_authority_id, to_authority_id, reassigned_by, reassigned_by_name, reason
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      complaintId,
+      complaint.department_id,
+      complaint.department_name || 'Unassigned',
+      targetDept.id,
+      targetDept.name,
+      complaint.authority_id,
+      newAuthority ? newAuthority.id : null,
+      req.user.id,
+      currentUserName,
+      reason.trim()
+    ]);
+
+    // 2. Update Complaint
+    const newReassignmentCount = (complaint.reassignment_count || 0) + 1;
+    await db.run(`
+      UPDATE complaints
+      SET department_id = ?,
+          department_name = ?,
+          authority_id = ?,
+          authority_name = ?,
+          authority_contact = ?,
+          reassignment_count = ?,
+          status = 'pending'
+      WHERE id = ?
+    `, [
+      targetDept.id,
+      targetDept.name,
+      newAuthority ? newAuthority.id : null,
+      newAuthority ? newAuthority.name : complaint.authority_name,
+      newAuthority ? (newAuthority.contact_phone || newAuthority.contact_email) : complaint.authority_contact,
+      newReassignmentCount,
+      complaintId
+    ]);
+
+    // 3. Log Authority Update
+    const auditRemark = `Department Reassignment: Transferred from [${complaint.department_name || 'General'}] to [${targetDept.name}]. Reason: "${reason.trim()}" (Authorized by: ${currentUserName})`;
+    await db.run(`
+      INSERT INTO authority_updates (complaint_id, official_id, update_text, status_change, action_type)
+      VALUES (?, ?, ?, 'pending', 'reassignment')
+    `, [complaintId, req.user.id, auditRemark]);
+
+    const author = await db.get('SELECT name, email FROM users WHERE id = ?', [complaint.user_id]);
+    const simulatedNotification = createSimulatedNotifications(
+      { ...complaint, department_name: targetDept.name },
+      author,
+      'pending',
+      auditRemark,
+      `[Raise 2 Resolve] Ticket #${complaint.complaint_code || complaint.id} Reassigned to ${targetDept.name}`
+    );
+
+    return res.json({
+      success: true,
+      message: `Complaint reassigned to ${targetDept.name}! Audit trail recorded.`,
+      new_department: targetDept.name,
+      reassignment_count: newReassignmentCount,
+      simulatedNotification
+    });
+  } catch (error) {
+    console.error('Reassign error:', error);
+    return res.status(500).json({ success: false, message: 'Server error reassigning complaint.' });
+  }
+});
+
+// POST /api/complaints/:id/flag / reject
 router.post('/:id/flag', authenticateToken, authorizeRoles('authority'), async (req, res) => {
   try {
     const complaintId = req.params.id;
@@ -442,15 +759,15 @@ router.post('/:id/flag', authenticateToken, authorizeRoles('authority'), async (
 
     const author = await db.get('SELECT name, email FROM users WHERE id = ?', [complaint.user_id]);
     const newFlagState = complaint.is_flagged ? 0 : 1;
-    const statusText = newFlagState ? 'flagged' : 'pending';
+    const statusText = newFlagState ? 'rejected' : 'pending';
 
     await db.run(
-      'UPDATE complaints SET is_flagged = ?, flag_reason = ?, status = ? WHERE id = ?',
-      [newFlagState, flag_reason || 'Flagged by authority as invalid or duplicate', statusText, complaintId]
+      'UPDATE complaints SET is_flagged = ?, flag_reason = ?, status = ?, verification_status = ? WHERE id = ?',
+      [newFlagState, flag_reason || 'Rejected by authority after review', statusText, newFlagState ? 'rejected' : 'unverified', complaintId]
     );
 
     const remarkText = newFlagState 
-      ? `Report Flagged: ${flag_reason || 'Inaccurate or duplicate entry.'}`
+      ? `Report Rejected / Flagged: ${flag_reason || 'Inaccurate or outside civic scope.'}`
       : 'Flag status cleared by municipal authority.';
 
     await db.run(`
@@ -463,7 +780,8 @@ router.post('/:id/flag', authenticateToken, authorizeRoles('authority'), async (
     return res.json({
       success: true,
       is_flagged: newFlagState === 1,
-      message: newFlagState ? 'Report flagged as invalid.' : 'Report flag cleared.',
+      status: statusText,
+      message: newFlagState ? 'Report rejected/flagged.' : 'Report flag cleared.',
       simulatedNotification
     });
   } catch (error) {
@@ -472,7 +790,7 @@ router.post('/:id/flag', authenticateToken, authorizeRoles('authority'), async (
   }
 });
 
-// POST /api/complaints/:id/authority-update (With simulated notification)
+// POST /api/complaints/:id/authority-update
 router.post('/:id/authority-update', authenticateToken, authorizeRoles('authority'), async (req, res) => {
   try {
     const complaintId = req.params.id;
@@ -501,12 +819,12 @@ router.post('/:id/authority-update', authenticateToken, authorizeRoles('authorit
       await db.run('UPDATE complaints SET status = ? WHERE id = ?', [nextStatus, complaintId]);
     }
 
-    // Create simulated notifications for Email & SMS demo
     const simulatedNotification = createSimulatedNotifications(complaint, author, nextStatus, update_text);
 
     return res.json({
       success: true,
-      message: 'Authority remarks & status update saved to SQLite!',
+      message: 'Authority remarks & status update saved to database!',
+      status: nextStatus,
       simulatedNotification
     });
   } catch (error) {

@@ -1,9 +1,9 @@
 async function runFullHealthCheck() {
   console.log('================================================================');
-  console.log('🩺 FULL SYSTEM HEALTH CHECK: BUILDION - RAISE 2 RESOLVE');
+  console.log('🩺 FULL SYSTEM HEALTH CHECK: RAISE 2 RESOLVE');
   console.log('================================================================\n');
 
-  const BASE_URL = 'http://localhost:5000';
+  const BASE_URL = process.env.BASE_URL || ('http://localhost:' + (process.env.PORT || 3000));
   let passedCount = 0;
   let totalChecks = 12;
 
@@ -20,7 +20,7 @@ async function runFullHealthCheck() {
 
   // 2. Citizen Registration
   console.log('[Check 2/12] Citizen Registration & Password Hashing (bcrypt)...');
-  const citizenEmail = `health_citizen_${Date.now()}@buildion.org`;
+  const citizenEmail = `health_citizen_${Date.now()}@raise2resolve.gov`;
   const regRes = await fetch(`${BASE_URL}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

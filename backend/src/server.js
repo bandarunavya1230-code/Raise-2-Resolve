@@ -8,9 +8,10 @@ const { getDB } = require('./config/db');
 const healthRoutes = require('./routes/health');
 const authRoutes = require('./routes/auth');
 const complaintRoutes = require('./routes/complaints');
+const locationRoutes = require('./routes/locations');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 // Ensure uploads folder exists
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -30,6 +31,7 @@ app.use('/uploads', express.static(uploadsDir));
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/complaints', complaintRoutes);
+app.use('/api', locationRoutes);
 
 // Root Endpoint
 app.get('/', (req, res) => {

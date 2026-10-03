@@ -3,10 +3,10 @@ const path = require('path');
 
 async function runMasterTest() {
   console.log('====================================================');
-  console.log('🏛️  BUILDION - RAISE 2 RESOLVE MASTER END-TO-END TEST');
+  console.log('🏛️  RAISE 2 RESOLVE MASTER END-TO-END TEST');
   console.log('====================================================\n');
 
-  const BASE_URL = 'http://localhost:5000';
+  const BASE_URL = process.env.BASE_URL || ('http://localhost:' + (process.env.PORT || 3000));
 
   // 1. Test Backend Health & SQLite DB Connection
   console.log('1. Testing Backend & Database Health...');
@@ -19,7 +19,7 @@ async function runMasterTest() {
 
   // 2. Test Citizen Registration
   console.log('2. Testing Citizen Registration...');
-  const testEmail = `final_citizen_${Date.now()}@buildion.org`;
+  const testEmail = `final_citizen_${Date.now()}@raise2resolve.gov`;
   const regRes = await fetch(`${BASE_URL}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

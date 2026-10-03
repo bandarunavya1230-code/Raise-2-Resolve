@@ -1,7 +1,7 @@
 {
   "name": "raise-2-resolve-backend",
   "version": "1.0.0",
-  "description": "Backend API for BUILDION - Raise 2 Resolve",
+  "description": "Backend API for Raise 2 Resolve",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

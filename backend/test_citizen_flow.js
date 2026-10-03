@@ -3,9 +3,10 @@ const path = require('path');
 
 async function testCitizenFlow() {
   console.log('--- Testing Citizen Flow ---');
+  const BASE_URL = process.env.BASE_URL || ('http://localhost:' + (process.env.PORT || 3000));
 
   // 1. Register a test citizen
-  const regRes = await fetch('http://localhost:5000/api/auth/register', {
+  const regRes = await fetch(`${BASE_URL}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -44,7 +45,7 @@ async function testCitizenFlow() {
     `--${boundary}--\r\n`;
 
   // 2. Submit Complaint with Multer image upload
-  const compRes = await fetch('http://localhost:5000/api/complaints', {
+  const compRes = await fetch(`${BASE_URL}/api/complaints`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -56,14 +57,14 @@ async function testCitizenFlow() {
   console.log('2. Create Complaint Response:', compData);
 
   // 3. Fetch My Complaints
-  const myRes = await fetch('http://localhost:5000/api/complaints/my', {
+  const myRes = await fetch(`${BASE_URL}/api/complaints/my`, {
     headers: { 'Authorization': `Bearer ${token}` }
   });
   const myData = await myRes.json();
   console.log('3. My Complaints Count:', myData.data?.length, 'Code:', myData.data[0]?.complaint_code);
 
   // 4. Fetch Complaint Details
-  const detailRes = await fetch(`http://localhost:5000/api/complaints/${compData.data.id}`);
+  const detailRes = await fetch(`${BASE_URL}/api/complaints/${compData.data.id}`);
   const detailData = await detailRes.json();
   console.log('4. Detailed View Code:', detailData.data?.complaint_code, 'Image Path:', detailData.data?.image_url);
 

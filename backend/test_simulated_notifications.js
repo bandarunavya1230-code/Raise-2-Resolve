@@ -1,18 +1,19 @@
 async function testSimulatedNotifications() {
   console.log('=== Testing Status Change -> Simulated Notification Flow ===');
+  const BASE_URL = process.env.BASE_URL || ('http://localhost:' + (process.env.PORT || 3000));
 
   // 1. Login as Authority
-  const authRes = await fetch('http://localhost:5000/api/auth/demo-authority', { method: 'POST' });
+  const authRes = await fetch(`${BASE_URL}/api/auth/demo-authority`, { method: 'POST' });
   const authData = await authRes.json();
   const token = authData.token;
 
   // 2. Fetch complaint list to pick ticket #1
-  const listRes = await fetch('http://localhost:5000/api/complaints');
+  const listRes = await fetch(`${BASE_URL}/api/complaints`);
   const listData = await listRes.json();
   const targetComplaint = listData.data[0];
 
   // 3. Update status & verify simulated notification in API response
-  const updateRes = await fetch(`http://localhost:5000/api/complaints/${targetComplaint.id}/authority-update`, {
+  const updateRes = await fetch(`${BASE_URL}/api/complaints/${targetComplaint.id}/authority-update`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

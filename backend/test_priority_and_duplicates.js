@@ -1,8 +1,9 @@
 async function testPriorityAndDuplicates() {
   console.log('=== Testing Automatic Priority & Duplicate Detection ===');
+  const BASE_URL = process.env.BASE_URL || ('http://localhost:' + (process.env.PORT || 3000));
 
   // 1. Check duplicate detection API
-  const dupCheckRes = await fetch('http://localhost:5000/api/complaints/check-similar', {
+  const dupCheckRes = await fetch(`${BASE_URL}/api/complaints/check-similar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -15,7 +16,7 @@ async function testPriorityAndDuplicates() {
   console.log('1. Duplicate Check Result:', dupCheckData.hasSimilar, 'Matches:', dupCheckData.matches.length);
 
   // 2. Register & Post a Critical Complaint
-  const regRes = await fetch('http://localhost:5000/api/auth/register', {
+  const regRes = await fetch(`${BASE_URL}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -46,7 +47,7 @@ async function testPriorityAndDuplicates() {
     `Central Park South\r\n` +
     `--${boundary}--\r\n`;
 
-  const compRes = await fetch('http://localhost:5000/api/complaints', {
+  const compRes = await fetch(`${BASE_URL}/api/complaints`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -62,7 +63,7 @@ async function testPriorityAndDuplicates() {
   });
 
   // 3. Upvote the complaint to boost score
-  const upvoteRes = await fetch(`http://localhost:5000/api/complaints/${compData.data.id}/support`, {
+  const upvoteRes = await fetch(`${BASE_URL}/api/complaints/${compData.data.id}/support`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}` }
   });
@@ -75,7 +76,7 @@ async function testPriorityAndDuplicates() {
   });
 
   // 4. Verify Complaints List sorting by Priority Score
-  const listRes = await fetch('http://localhost:5000/api/complaints');
+  const listRes = await fetch(`${BASE_URL}/api/complaints`);
   const listData = await listRes.json();
   console.log('4. Top Priority Complaint in DB Feed:', {
     topCode: listData.data[0]?.complaint_code,
